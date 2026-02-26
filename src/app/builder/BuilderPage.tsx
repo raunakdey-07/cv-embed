@@ -24,7 +24,15 @@ import { createEmptyResume, type Resume } from '../../types/resume'
 
 
 function normalizeBaseUrl(value: string): string {
-  return value.trim().replace(/\/+$/, '')
+  const trimmed = value.trim().replace(/\/+$/, '')
+  if (!trimmed) return ''
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  try {
+    return new URL(withProtocol).origin
+  } catch {
+    return ''
+  }
 }
 
 function getDefaultEmbedBaseUrl(): string {
@@ -46,9 +54,11 @@ function getDefaultEmbedBaseUrl(): string {
 }
 
 function buildEmbedArtifacts(baseUrl: string, resume: Resume): EmbedArtifacts {
-  const origin = normalizeBaseUrl(baseUrl)
+  const origin = normalizeBaseUrl(baseUrl) || getDefaultEmbedBaseUrl()
   const encoded = encodeResumeForUrl(resume)
-  const portableUrl = `${origin}/embed/portable?data=${encoded}`
+  const portable = new URL('/embed/portable', origin)
+  portable.searchParams.set('data', encoded)
+  const portableUrl = portable.toString()
   const iframeSnippet = `<iframe src="${portableUrl}" width="100%" height="1100" frameborder="0"></iframe>`
   const sdkSnippet = `<script src="${origin}/sdk.js"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${JSON.stringify(resume, null, 2)},\n    options: { showDownload: false }\n  });\n</script>`
   return { portableUrl, iframeSnippet, sdkSnippet }
