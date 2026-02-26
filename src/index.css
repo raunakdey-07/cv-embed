@@ -1056,3 +1056,101 @@ h4.skill-cat-title { margin: 0 0 6px; }
   .preview-head-actions { width: 100%; justify-content: space-between; }
   .field-grid { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 900px) {
+  .app-header {
+    padding: 0 12px;
+  }
+
+  .app-main {
+    padding: 8px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .toolbar-strip-right {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .toolbar-sep {
+    display: none;
+  }
+
+  .preview-head-main {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .embed-strip {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .embed-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .embed-label {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .embed-url {
+    width: 100%;
+  }
+
+  .score-help-popover {
+    width: min(240px, calc(100vw - 28px));
+    right: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .brand-row h1 {
+    font-size: 15px;
+  }
+
+  .brand-pill {
+    padding: 2px 7px;
+  }
+
+  .app-main {
+    padding: 6px;
+  }
+
+  .panel {
+    padding: 10px;
+  }
+
+  .nav-tab {
+    padding: 6px 9px;
+  }
+
+  .resume-template {
+    padding: 14px;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .resume-template .resume-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .resume-template .resume-row-meta {
+    white-space: normal;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
