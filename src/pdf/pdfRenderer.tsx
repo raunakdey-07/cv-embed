@@ -18,7 +18,7 @@ function getPdfStyleConfig(resume: Resume) {
       : 'Helvetica'
   const compactDensity = options.density === 'compact'
   const relaxedDensity = options.density === 'relaxed'
-  const headerLineGap = compactDensity ? 1 : relaxedDensity ? 3 : 2
+  const headerLineGap = compactDensity ? 0 : relaxedDensity ? 2 : 1
   const headingColor = options.accentColor || '#111111'
   const fontSize = options.fontSize === 'small' ? 9 : options.fontSize === 'large' ? 11 : 10
   const lineHeight = options.lineHeight === 'tight' ? 1.2 : options.lineHeight === 'relaxed' ? 1.6 : 1.4
@@ -37,18 +37,21 @@ function getPdfStyleConfig(resume: Resume) {
     name: {
       fontSize: options.fontSize === 'large' ? (compactDensity ? 19 : relaxedDensity ? 21 : 20) : (compactDensity ? 17 : relaxedDensity ? 19 : 18),
       marginBottom: 0,
+      lineHeight: 1,
       fontWeight: 700,
       color: headingColor,
     },
     headline: {
       marginTop: headerLineGap,
       marginBottom: 0,
+      lineHeight: 1.15,
       color: '#374151',
     },
     contact: {
       color: '#374151',
-      marginTop: headerLineGap,
+      marginTop: Math.max(0, headerLineGap - 1),
       marginBottom: 0,
+      lineHeight: 1.15,
     },
     linksRow: {
       display: 'flex',
@@ -326,7 +329,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
         <View style={styles.header}>
           <Text style={styles.name}>{resume.basics.name || 'Your Name'}</Text>
           {resume.basics.headline ? <Text style={styles.headline}>{resume.basics.headline}</Text> : null}
-          <Text style={hasHeadline ? styles.contact : [styles.contact, { marginTop: 1 }]}>{[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}</Text>
+          <Text style={hasHeadline ? styles.contact : [styles.contact, { marginTop: 0 }]}>{[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}</Text>
           <View style={styles.linksRow}>
             {resume.basics.links
               .filter((link) => !!link.url)
