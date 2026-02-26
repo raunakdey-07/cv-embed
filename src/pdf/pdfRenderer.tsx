@@ -18,7 +18,11 @@ function getPdfStyleConfig(resume: Resume) {
       : 'Helvetica'
   const compactDensity = options.density === 'compact'
   const relaxedDensity = options.density === 'relaxed'
+  // Gap between header rows (headline → contact → links), matching CSS p margin
   const headerLineGap = compactDensity ? 2 : relaxedDensity ? 4 : 3
+  // Below-name spacing: replaces the h1 line-height leading (5.6px comfortable, 4.8px compact, 6px relaxed)
+  // that CSS adds automatically but react-pdf omits for single-line Text
+  const nameBottomGap = compactDensity ? 5 : relaxedDensity ? 8 : 6
   const headingColor = options.accentColor || '#111111'
   const fontSize = options.fontSize === 'small' ? 9 : options.fontSize === 'large' ? 11 : 10
   const lineHeight = options.lineHeight === 'tight' ? 1.2 : options.lineHeight === 'relaxed' ? 1.6 : 1.4
@@ -36,7 +40,7 @@ function getPdfStyleConfig(resume: Resume) {
     },
     name: {
       fontSize: options.fontSize === 'large' ? (compactDensity ? 19 : relaxedDensity ? 21 : 20) : (compactDensity ? 17 : relaxedDensity ? 19 : 18),
-      marginBottom: 0,
+      marginBottom: nameBottomGap,
       fontWeight: 700,
       color: headingColor,
     },
