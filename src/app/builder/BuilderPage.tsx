@@ -181,10 +181,16 @@ function downloadJson(resume: Resume): void {
   URL.revokeObjectURL(url)
 }
 
+const DRAFT_SAVE_DEBOUNCE_MS = 900
+
 export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const exportRef = useRef<HTMLDivElement>(null)
   const mobileActionsRef = useRef<HTMLDivElement>(null)
+  const pageCountCacheRef = useRef<Map<string, number>>(new Map())
+  const pageCountJobRef = useRef(0)
+  const pageCountDelayTimerRef = useRef<number | null>(null)
+  const pageCountIdleHandleRef = useRef<number | null>(null)
 
   const [resume, setResume] = useState<Resume>(() => loadDraft() ?? createEmptyResume())
   const [embedArtifacts, setEmbedArtifacts] = useState<EmbedArtifacts | null>(null)
@@ -194,15 +200,23 @@ export function BuilderPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [mobileExportOpen, setMobileExportOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
+  const [isPageEstimateStale, setIsPageEstimateStale] = useState(false)
+  const [isPageEstimating, setIsPageEstimating] = useState(false)
+  const [lastEstimateDurationMs, setLastEstimateDurationMs] = useState<number | null>(null)
+  const [lastEstimateSource, setLastEstimateSource] = useState<'cache' | 'idle' | 'urgent' | null>(null)
+  const [lastEstimateUpdatedAt, setLastEstimateUpdatedAt] = useState<number | null>(null)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
   const [embedPreset, setEmbedPreset] = useState<EmbedPreset>('placement')
   const [embedIframeHeight, setEmbedIframeHeight] = useState(1100)
   const [embedShowDownload, setEmbedShowDownload] = useState(false)
+  const isEmbedPanelOpen = embedArtifacts !== null
   const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
   const [saveState, setSaveState] = useState<'saving' | 'saved'>('saved')
   const [savedAt, setSavedAt] = useState<number>(() => Date.now())
   const [relativeNow, setRelativeNow] = useState<number>(() => Date.now())
+  const [benchmarkBusy, setBenchmarkBusy] = useState(false)
+  const [benchmarkSummary, setBenchmarkSummary] = useState('')
 
   useEffect(() => {
     setSaveState('saving')
@@ -210,7 +224,7 @@ export function BuilderPage() {
       saveDraft({ ...resume, meta: { ...resume.meta, updatedAt: new Date().toISOString() } })
       setSavedAt(Date.now())
       setSaveState('saved')
-    }, 220)
+    }, DRAFT_SAVE_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
   }, [resume])
@@ -249,26 +263,125 @@ export function BuilderPage() {
   }, [])
 
   useEffect(() => {
-    if (!embedArtifacts) return
+    if (!isEmbedPanelOpen) return
     setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume, {
       iframeHeight: embedIframeHeight,
       showDownload: embedShowDownload,
     }))
-  }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
+  }, [isEmbedPanelOpen, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
 
-  useEffect(() => {
-    let cancelled = false
-    const timer = setTimeout(async () => {
-      try {
-        const { countPdfPages } = await import('../../pdf/pdfRenderer')
-        const count = await countPdfPages(resume)
-        if (!cancelled) setEstimatedPages(count)
-      } catch {
+  const clearScheduledPageCount = useCallback(() => {
+    if (pageCountDelayTimerRef.current !== null) {
+      window.clearTimeout(pageCountDelayTimerRef.current)
+      pageCountDelayTimerRef.current = null
+    }
+
+    if (pageCountIdleHandleRef.current !== null) {
+      if (typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(pageCountIdleHandleRef.current)
+      } else {
+        window.clearTimeout(pageCountIdleHandleRef.current)
+      }
+      pageCountIdleHandleRef.current = null
+    }
+  }, [])
+
+  const schedulePageEstimate = useCallback((priority: 'idle' | 'urgent') => {
+    clearScheduledPageCount()
+    setIsPageEstimateStale(true)
+    setIsPageEstimating(true)
+
+    const delay = priority === 'urgent' ? 80 : 1800
+
+    pageCountDelayTimerRef.current = window.setTimeout(() => {
+      pageCountDelayTimerRef.current = null
+
+      const run = async () => {
+        const cacheKey = JSON.stringify(resume)
+        const cached = pageCountCacheRef.current.get(cacheKey)
+        if (typeof cached === 'number') {
+          setEstimatedPages(cached)
+          setLastEstimateDurationMs(0)
+          setLastEstimateSource('cache')
+          setLastEstimateUpdatedAt(Date.now())
+          setIsPageEstimateStale(false)
+          setIsPageEstimating(false)
+          return
+        }
+
+        const jobId = pageCountJobRef.current + 1
+        pageCountJobRef.current = jobId
+        const perfLabel = `cv-embed-page-estimate-${jobId}`
+        const startedAt = performance.now()
+        performance.mark(`${perfLabel}-start`)
+
+        try {
+          const { countPdfPages } = await import('../../pdf/pdfRenderer')
+          const count = await countPdfPages(resume)
+          if (pageCountJobRef.current !== jobId) {
+            return
+          }
+
+          pageCountCacheRef.current.set(cacheKey, count)
+          if (pageCountCacheRef.current.size > 24) {
+            const oldestKey = pageCountCacheRef.current.keys().next().value as string | undefined
+            if (oldestKey) {
+              pageCountCacheRef.current.delete(oldestKey)
+            }
+          }
+
+          performance.mark(`${perfLabel}-end`)
+          performance.measure(perfLabel, `${perfLabel}-start`, `${perfLabel}-end`)
+          const duration = Math.max(0, Math.round(performance.now() - startedAt))
+
+          setEstimatedPages(count)
+          setLastEstimateDurationMs(duration)
+          setLastEstimateSource(priority)
+          setLastEstimateUpdatedAt(Date.now())
+          setIsPageEstimateStale(false)
+          setIsPageEstimating(false)
+
+          performance.clearMarks(`${perfLabel}-start`)
+          performance.clearMarks(`${perfLabel}-end`)
+          performance.clearMeasures(perfLabel)
+        } catch {
+          if (pageCountJobRef.current === jobId) {
+            setIsPageEstimateStale(false)
+            setIsPageEstimating(false)
+          }
+          return
+        }
+      }
+
+      if (priority === 'urgent') {
+        void run()
         return
       }
-    }, 400)
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [resume])
+
+      if (typeof window.requestIdleCallback === 'function') {
+        pageCountIdleHandleRef.current = window.requestIdleCallback(() => {
+          pageCountIdleHandleRef.current = null
+          void run()
+        }, { timeout: 1400 })
+      } else {
+        pageCountIdleHandleRef.current = window.setTimeout(() => {
+          pageCountIdleHandleRef.current = null
+          void run()
+        }, 250)
+      }
+    }, delay)
+  }, [clearScheduledPageCount, resume])
+
+  useEffect(() => {
+    schedulePageEstimate('idle')
+    return () => clearScheduledPageCount()
+  }, [clearScheduledPageCount, schedulePageEstimate])
+
+  useEffect(() => {
+    if (exportOpen || mobileExportOpen || isEmbedPanelOpen) {
+      schedulePageEstimate('urgent')
+    }
+  }, [exportOpen, isEmbedPanelOpen, mobileExportOpen, schedulePageEstimate])
 
   const validation = useMemo(() => validateResume(resume), [resume])
 
@@ -360,9 +473,47 @@ export function BuilderPage() {
     }
   }, [resume])
 
+  const nextActionSection = useMemo(() => {
+    return completion.firstMissingEssentialSection ?? nextIssueSection
+  }, [completion.firstMissingEssentialSection, nextIssueSection])
+
+  const fixNextTooltipText = useMemo(() => {
+    if (nextActionSection) {
+      return `Next action: complete ${SECTION_LABELS[nextActionSection]} first. Click this pill to jump.`
+    }
+    return 'Next action: fix listed validation issues. Click this pill to jump.'
+  }, [nextActionSection])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const expected = completion.firstMissingEssentialSection ?? nextIssueSection
+    if (expected !== nextActionSection) {
+      console.warn('[cv-embed] next action mismatch detected', {
+        expected,
+        nextActionSection,
+      })
+    }
+  }, [completion.firstMissingEssentialSection, nextActionSection, nextIssueSection])
+
   const saveStatusText = saveState === 'saving'
     ? 'Saving draft...'
     : `Saved ${formatRelativeTime(savedAt, relativeNow)}`
+
+  const pageIndicatorText = isPageEstimating && isPageEstimateStale
+    ? `Pages: ~${estimatedPages} (estimating...)`
+    : `Pages: ${estimatedPages}`
+
+  const pageIndicatorTitle = (() => {
+    if (isPageEstimating) {
+      return 'Estimated A4 pages in export (estimating...)'
+    }
+
+    if (lastEstimateSource && typeof lastEstimateDurationMs === 'number' && lastEstimateUpdatedAt) {
+      return `Estimated A4 pages in export • ${lastEstimateSource} • ${lastEstimateDurationMs}ms • updated ${formatRelativeTime(lastEstimateUpdatedAt, relativeNow)}`
+    }
+
+    return 'Estimated A4 pages in export'
+  })()
 
   const onImportJson = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -438,6 +589,24 @@ export function BuilderPage() {
     setMobileExportOpen(false)
   }, [isMobileLayout, resume])
 
+  const onRunPdfBenchmark = useCallback(async () => {
+    if (benchmarkBusy) return
+    try {
+      setBenchmarkBusy(true)
+      const { benchmarkReactPdfEngine } = await import('../../pdf/pdfRenderer')
+      const stats = await benchmarkReactPdfEngine(resume, 4)
+      const summary = `PDF bench p50 ${stats.p50Ms}ms • avg ${stats.avgMs}ms • ${Math.round(stats.avgHeadingCoveragePct)}% headings`
+      setBenchmarkSummary(summary)
+      setCopyState(summary)
+      setTimeout(() => setCopyState(''), 1800)
+      if (import.meta.env.DEV) {
+        console.info('[cv-embed] pdf benchmark', stats)
+      }
+    } finally {
+      setBenchmarkBusy(false)
+    }
+  }, [benchmarkBusy, resume])
+
   const copyTo = async (label: string, value: string) => {
     await navigator.clipboard.writeText(value)
     setCopyState(`${label} copied`)
@@ -453,11 +622,7 @@ export function BuilderPage() {
     `section-shell ${activeSection === id ? 'is-active' : 'is-compact'}`
 
   const jumpToFirstIssue = useCallback(() => {
-    const section = completion.firstMissingEssentialSection
-      ?? (() => {
-        const issue = validation.errors[0] ?? validation.warnings[0]
-        return issue ? getSectionFromIssue(issue) : null
-      })()
+    const section = nextActionSection
     if (!section) return
 
     if (isMobileLayout) {
@@ -468,7 +633,7 @@ export function BuilderPage() {
     requestAnimationFrame(() => {
       document.getElementById(`section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
-  }, [completion.firstMissingEssentialSection, isMobileLayout, validation.errors, validation.warnings])
+  }, [isMobileLayout, nextActionSection])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -542,8 +707,17 @@ export function BuilderPage() {
         <div className="completion-strip" title="Readiness based on section coverage, essentials, and validation state">
           <div className="completion-head">
             <div className="completion-title-group">
-              <span className="completion-title">Resume Readiness</span>
-              <span className="completion-subtitle">{completion.done}/{completion.total} sections complete</span>
+              <div className="completion-title-row">
+                <span className="completion-title">Resume Readiness</span>
+                <span className="completion-inline-tools">
+                  <span className="completion-info-wrap" tabIndex={0} aria-label="Readiness details">
+                    <button type="button" className="completion-info-btn">i</button>
+                    <span className="completion-pill-popover completion-info-popover" role="tooltip">
+                      {completion.done}/{completion.total} sections complete • Essentials {completion.essentialsDone}/{completion.essentialsTotal}
+                    </span>
+                  </span>
+                </span>
+              </div>
             </div>
             <span className="completion-value">{completion.percent}%</span>
           </div>
@@ -572,9 +746,7 @@ export function BuilderPage() {
                 <IconAlertTriangle size={10} /> {issueSummary.label} · Fix next
               </button>
                 <div className="completion-pill-popover" role="tooltip">
-                  {nextIssueSection
-                    ? `Next action: fix ${SECTION_LABELS[nextIssueSection]} issues first. Click this pill to jump.`
-                    : 'Next action: fix listed validation issues. Click this pill to jump.'}
+                  {fixNextTooltipText}
                 </div>
               </div>
             ) : (
@@ -723,7 +895,12 @@ export function BuilderPage() {
           <div className="preview-head-main">
             <IconEye size={16} />
             <span className="section-title">Preview</span>
-            <span className="page-indicator" title="Estimated A4 pages in export">Pages: {estimatedPages}</span>
+            <span
+              className={`page-indicator${isPageEstimateStale ? ' stale' : ''}${isPageEstimating ? ' estimating' : ''}`}
+              title={pageIndicatorTitle}
+            >
+              {pageIndicatorText}
+            </span>
             <span className={`save-indicator ${saveState === 'saving' ? 'saving' : 'saved'}`} title="Draft status">
               {saveStatusText}
             </span>
@@ -738,6 +915,17 @@ export function BuilderPage() {
               >
                 <IconLink size={14} />
               </button>
+              {import.meta.env.DEV ? (
+                <button
+                  type="button"
+                  className="tool-btn"
+                  title={benchmarkSummary || 'Benchmark local PDF engine'}
+                  onClick={() => void onRunPdfBenchmark()}
+                  disabled={benchmarkBusy}
+                >
+                  <IconZap size={14} />
+                </button>
+              ) : null}
               <button type="button" className="tool-btn" title="Import resume JSON" onClick={() => fileRef.current?.click()}><IconUpload size={14} /></button>
               <div className="export-menu" ref={exportRef}>
                 <button type="button" className="tool-btn" title="Export resume" onClick={() => setExportOpen((o) => !o)} disabled={busy}>

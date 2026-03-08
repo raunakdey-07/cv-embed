@@ -527,9 +527,15 @@ button {
 }
 
 .completion-title-group {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: center;
   min-width: 0;
+}
+
+.completion-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .completion-title {
@@ -540,10 +546,50 @@ button {
   color: var(--text-2);
 }
 
-.completion-subtitle {
-  font-family: 'Azeret Mono', monospace;
-  font-size: 9px;
+.completion-inline-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.completion-info-wrap {
+  position: relative;
+  display: inline-flex;
+  outline: none;
+}
+
+.completion-info-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
   color: var(--text-3);
+  font-size: 10px;
+  font-family: 'Azeret Mono', monospace;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.completion-info-wrap:hover .completion-info-btn,
+.completion-info-wrap:focus-within .completion-info-btn {
+  color: var(--text);
+  border-color: var(--accent-mid);
+}
+
+.completion-info-popover {
+  top: calc(100% + 8px);
+  max-width: 280px;
+}
+
+.completion-info-wrap:hover .completion-info-popover,
+.completion-info-wrap:focus-within .completion-info-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .completion-value {
@@ -1114,6 +1160,16 @@ h4.skill-cat-title { margin: 0 0 6px; }
   border: 1px solid var(--accent-mid);
   border-radius: 999px;
   padding: 2px 8px;
+}
+
+.page-indicator.stale {
+  color: var(--orange);
+  background: var(--orange-dim);
+  border-color: var(--border);
+}
+
+.page-indicator.estimating {
+  opacity: 0.85;
 }
 
 .save-indicator {

@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV-Embed SDK v2 Playground</title>
+  <style>
+    :root {
+      --bg: #0c0d11;
+      --surface: #131419;
+      --surface-2: #191a22;
+      --border: #262837;
+      --text: #f3f5fb;
+      --text-2: #c1c7dc;
+      --text-3: #8b93b2;
+      --accent: #7c5cfc;
+      --accent-dim: rgba(124, 92, 252, 0.12);
+      --green: #36d399;
+      --orange: #f5a623;
+      --red: #ef5f5f;
+      --r: 8px;
+      --r-lg: 10px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Bricolage Grotesque", system-ui, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 10% -20%, #1d1e2b 0%, var(--bg) 60%);
+    }
+
+    .app {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      padding: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .muted { color: var(--text-3); font-size: 13px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .controls { display: grid; gap: 10px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    label {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+      font-family: "Azeret Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      background: var(--surface-2);
+      color: var(--text-2);
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    button:hover { border-color: var(--accent); color: var(--text); }
+    .btn-primary { background: var(--accent-dim); color: var(--text); border-color: rgba(124, 92, 252, 0.4); }
+
+    #embed-target {
+      min-height: 240px;
+      border: 1px dashed var(--border);
+      border-radius: var(--r);
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .log {
+      background: #0f1118;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 8px;
+      max-height: 230px;
+      overflow: auto;
+      font-family: "Azeret Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      line-height: 1.4;
+      color: var(--text-2);
+    }
+
+    .ok { color: var(--green); }
+    .warn { color: var(--orange); }
+    .bad { color: var(--red); }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="panel">
+      <h1>CV-Embed SDK v2 Playground</h1>
+      <p class="muted">Render, update, destroy, and inspect live events from <code>sdk.js?v=2</code>.</p>
+    </section>
+
+    <section class="layout">
+      <div class="panel controls">
+        <div class="grid">
+          <label>Base URL
+            <input id="baseUrl" type="text" placeholder="https://cv-embed.vercel.app" />
+          </label>
+          <label>Height
+            <input id="height" type="number" min="480" max="2400" step="50" value="960" />
+          </label>
+          <label>Mode
+            <select id="mode">
+              <option value="guided">guided</option>
+              <option value="preview">preview</option>
+              <option value="edit">edit</option>
+            </select>
+          </label>
+          <label>Locked Template
+            <select id="lockedTemplate">
+              <option value="">none</option>
+              <option value="minimal">minimal</option>
+              <option value="compact">compact</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid">
+          <label><input id="showDownload" type="checkbox" checked /> showDownload</label>
+          <label><input id="autoHeight" type="checkbox" checked /> autoHeight</label>
+          <label><input id="debug" type="checkbox" /> debug</label>
+          <label><input id="disableDownload" type="checkbox" /> disableDownload</label>
+        </div>
+
+        <label>Read-only Sections (comma separated)
+          <input id="readOnlySections" type="text" placeholder="basics,education,skills" />
+        </label>
+
+        <label>Resume JSON
+          <textarea id="resumeJson"></textarea>
+        </label>
+
+        <div class="row">
+          <button class="btn-primary" id="renderBtn">Render</button>
+          <button id="updateBtn">Update</button>
+          <button id="destroyBtn">Destroy</button>
+          <button id="clearLogBtn">Clear Log</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="embed-target"></div>
+        <p class="muted" id="statusLine">Status: idle</p>
+        <div class="log" id="eventLog"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/sdk.js?v=2"></script>
+  <script>
+    (function () {
+      var embed = null;
+      var now = new Date().toISOString();
+
+      var sampleResume = {
+        meta: {
+          version: "1.0",
+          template: "minimal",
+          createdAt: now,
+          updatedAt: now,
+          documentOptions: {
+            accentColor: "#111111",
+            fontFamily: "satoshi",
+            fontSize: "normal",
+            lineHeight: "normal",
+            sectionHeadingStyle: "rule",
+            bulletStyle: "dot",
+            dateStyle: "range",
+            density: "comfortable",
+            linkDisplay: "label",
+            showSections: {
+              summary: true,
+              education: true,
+              experience: true,
+              projects: true,
+              skills: true,
+              certifications: true,
+              accomplishments: true,
+              activities: true,
+              volunteering: true,
+              publications: true
+            },
+            sectionOrder: [
+              "summary","education","experience","projects","skills","certifications","accomplishments","activities","volunteering","publications"
+            ]
+          }
+        },
+        basics: {
+          name: "Alex Johnson",
+          headline: "Software Engineer",
+          email: "alex@example.com",
+          phone: "+1 555 123 0000",
+          location: "Bangalore, India",
+          summary: "Builds reliable frontend and platform tooling.",
+          links: [{ label: "GitHub", url: "https://github.com/alex" }]
+        },
+        education: [{ institution: "ABC University", degree: "B.Tech", field: "CSE", cgpa: "8.7", startDate: "2020", endDate: "2024", location: "Bangalore" }],
+        experience: [{ company: "TechCorp", role: "SDE Intern", location: "Remote", startDate: "2023-05", endDate: "2023-08", bullets: ["Built internal dashboards", "Reduced bug triage time by 25%"] }],
+        projects: [{ title: "Resume Lab", projectLink: "https://example.com", repoLink: "https://github.com/example/repo", techStack: ["React", "TypeScript"], startDate: "2023", endDate: "2024", bullets: ["Built ATS-friendly resume builder"] }],
+        skills: { languages: ["TypeScript", "JavaScript"], frameworks: ["React"], tools: ["Git", "Vite"], other: [] },
+        certifications: [],
+        accomplishments: [{ title: "Hackathon Winner", organization: "XYZ", location: "Bangalore", startDate: "2023", endDate: "2023", bullets: ["Won 1st place out of 300 teams"] }],
+        activities: [],
+        volunteering: [],
+        publications: []
+      };
+
+      var resumeJson = document.getElementById("resumeJson");
+      var baseUrl = document.getElementById("baseUrl");
+      var height = document.getElementById("height");
+      var mode = document.getElementById("mode");
+      var showDownload = document.getElementById("showDownload");
+      var autoHeight = document.getElementById("autoHeight");
+      var debug = document.getElementById("debug");
+      var disableDownload = document.getElementById("disableDownload");
+      var readOnlySections = document.getElementById("readOnlySections");
+      var lockedTemplate = document.getElementById("lockedTemplate");
+      var eventLog = document.getElementById("eventLog");
+      var statusLine = document.getElementById("statusLine");
+
+      resumeJson.value = JSON.stringify(sampleResume, null, 2);
+      baseUrl.value = window.location.origin;
+
+      function appendLog(type, message, payload) {
+        var stamp = new Date().toLocaleTimeString();
+        var line = "[" + stamp + "] " + type + " - " + message;
+        if (payload) {
+          line += "\n" + JSON.stringify(payload, null, 2);
+        }
+        eventLog.textContent = line + "\n\n" + eventLog.textContent;
+      }
+
+      function getConfig() {
+        var data;
+        try {
+          data = JSON.parse(resumeJson.value);
+        } catch (err) {
+          appendLog("error", "Invalid JSON", { error: String(err) });
+          throw err;
+        }
+
+        var ro = readOnlySections.value
+          .split(",")
+          .map(function (value) { return value.trim(); })
+          .filter(Boolean);
+
+        return {
+          target: "#embed-target",
+          baseUrl: baseUrl.value.trim() || window.location.origin,
+          resumeData: data,
+          height: Number(height.value || 960),
+          theme: {
+            density: "compact",
+            fontScale: 1,
+            radius: 8
+          },
+          options: {
+            showDownload: !!showDownload.checked,
+            autoHeight: !!autoHeight.checked,
+            mode: mode.value,
+            debug: !!debug.checked,
+            disableDownload: !!disableDownload.checked,
+            lockedTemplate: lockedTemplate.value || undefined,
+            readOnlySections: ro,
+            eventTargetOrigin: window.location.origin
+          },
+          events: {
+            onReady: function (payload) {
+              statusLine.textContent = "Status: ready";
+              appendLog("event", "onReady", payload);
+            },
+            onHeightChange: function (payload) {
+              appendLog("event", "onHeightChange", payload);
+            },
+            onValidationChange: function (payload) {
+              appendLog("event", "onValidationChange", payload);
+            },
+            onSectionFocus: function (payload) {
+              appendLog("event", "onSectionFocus", payload);
+            },
+            onExport: function (payload) {
+              appendLog("event", "onExport", payload);
+            },
+            onMessage: function (message) {
+              appendLog("bridge", message.event, message.payload);
+            }
+          }
+        };
+      }
+
+      document.getElementById("renderBtn").addEventListener("click", function () {
+        try {
+          if (embed && embed.destroy) {
+            embed.destroy();
+          }
+          embed = CVEmbed.render(getConfig());
+          statusLine.textContent = "Status: rendered";
+          appendLog("info", "Embed rendered");
+        } catch (err) {
+          statusLine.textContent = "Status: render failed";
+          appendLog("error", "Render failed", { error: String(err) });
+        }
+      });
+
+      document.getElementById("updateBtn").addEventListener("click", function () {
+        if (!embed || !embed.update) {
+          appendLog("warn", "No active instance. Render first.");
+          return;
+        }
+
+        try {
+          embed.update(getConfig());
+          appendLog("info", "Embed updated");
+        } catch (err) {
+          appendLog("error", "Update failed", { error: String(err) });
+        }
+      });
+
+      document.getElementById("destroyBtn").addEventListener("click", function () {
+        if (!embed || !embed.destroy) {
+          appendLog("warn", "No active instance to destroy.");
+          return;
+        }
+        embed.destroy();
+        embed = null;
+        statusLine.textContent = "Status: destroyed";
+        appendLog("info", "Embed destroyed");
+      });
+
+      document.getElementById("clearLogBtn").addEventListener("click", function () {
+        eventLog.textContent = "";
+      });
+
+      appendLog("info", "SDK playground ready. Click Render.");
+    })();
+  </script>
+</body>
+</html>

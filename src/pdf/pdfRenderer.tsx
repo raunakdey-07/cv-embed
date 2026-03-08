@@ -347,8 +347,91 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
   )
 }
 
+async function renderResumePdfBlob(resume: Resume): Promise<Blob> {
+  return pdf(<ResumePdfDocument resume={resume} />).toBlob()
+}
+
+function percentile(values: number[], pct: number): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((pct / 100) * sorted.length) - 1))
+  return sorted[index]
+}
+
+export interface PdfBenchmarkStats {
+  engine: 'react-pdf'
+  iterations: number
+  minMs: number
+  maxMs: number
+  avgMs: number
+  p50Ms: number
+  p95Ms: number
+  avgSizeKb: number
+  avgHeadingCoveragePct: number
+  samplesMs: number[]
+}
+
+function expectedSectionHeadings(resume: Resume): string[] {
+  const options = resume.meta.documentOptions
+  const headings: string[] = []
+
+  if (options.showSections.summary && hasText(resume.basics.summary)) headings.push('Summary')
+  if (options.showSections.education && hasContent(resume.education)) headings.push('Education')
+  if (options.showSections.experience && hasContent(resume.experience)) headings.push('Experience')
+  if (options.showSections.projects && hasContent(resume.projects)) headings.push('Projects')
+  if (options.showSections.skills && hasSkills(resume.skills)) headings.push('Skills')
+  if (options.showSections.certifications && hasContent(resume.certifications)) headings.push('Certifications')
+  if (options.showSections.accomplishments && hasContent(resume.accomplishments)) headings.push('Accomplishments')
+  if (options.showSections.activities && hasContent(resume.activities)) headings.push('Extra-curricular Activities')
+  if (options.showSections.volunteering && hasContent(resume.volunteering)) headings.push('Volunteering')
+  if (options.showSections.publications && hasContent(resume.publications)) headings.push('Publications')
+
+  return headings
+}
+
+export async function benchmarkReactPdfEngine(resume: Resume, iterations = 3): Promise<PdfBenchmarkStats> {
+  const runs = Math.max(1, Math.min(12, Math.floor(iterations)))
+  const samplesMs: number[] = []
+  const sizesKb: number[] = []
+  const headingCoveragePct: number[] = []
+  const expectedHeadings = expectedSectionHeadings(resume)
+
+  for (let index = 0; index < runs; index += 1) {
+    const start = performance.now()
+    const blob = await renderResumePdfBlob(resume)
+    const end = performance.now()
+    samplesMs.push(Math.max(0, Math.round(end - start)))
+    sizesKb.push(blob.size / 1024)
+
+    const text = await blob.text()
+    if (expectedHeadings.length === 0) {
+      headingCoveragePct.push(100)
+    } else {
+      const matched = expectedHeadings.filter((heading) => text.includes(heading)).length
+      headingCoveragePct.push(Math.round((matched / expectedHeadings.length) * 100))
+    }
+  }
+
+  const totalMs = samplesMs.reduce((sum, value) => sum + value, 0)
+  const totalKb = sizesKb.reduce((sum, value) => sum + value, 0)
+  const totalCoverage = headingCoveragePct.reduce((sum, value) => sum + value, 0)
+
+  return {
+    engine: 'react-pdf',
+    iterations: runs,
+    minMs: samplesMs.length > 0 ? Math.min(...samplesMs) : 0,
+    maxMs: samplesMs.length > 0 ? Math.max(...samplesMs) : 0,
+    avgMs: runs > 0 ? Math.round(totalMs / runs) : 0,
+    p50Ms: Math.round(percentile(samplesMs, 50)),
+    p95Ms: Math.round(percentile(samplesMs, 95)),
+    avgSizeKb: runs > 0 ? totalKb / runs : 0,
+    avgHeadingCoveragePct: runs > 0 ? totalCoverage / runs : 0,
+    samplesMs,
+  }
+}
+
 export async function countPdfPages(resume: Resume): Promise<number> {
-  const blob = await pdf(<ResumePdfDocument resume={resume} />).toBlob()
+  const blob = await renderResumePdfBlob(resume)
   const text = await blob.text()
   const treeMatch = text.match(/\/Type\s*\/Pages[^>]*?\/Count\s+(\d+)/)
   if (treeMatch) return parseInt(treeMatch[1], 10)
@@ -357,7 +440,7 @@ export async function countPdfPages(resume: Resume): Promise<number> {
 }
 
 export async function downloadResumePdf(resume: Resume, fileName: string): Promise<void> {
-  const blob = await pdf(<ResumePdfDocument resume={resume} />).toBlob()
+  const blob = await renderResumePdfBlob(resume)
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
 

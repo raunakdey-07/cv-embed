@@ -118,6 +118,21 @@ The iframe posts messages shaped like:
 
 `validationChange` includes a machine-readable `issues` array with `severity`, `section`, `code`, and `message`.
 
+## SDK Playground
+
+- Open `/sdk-playground.html` to test SDK v2 integrations interactively.
+- It supports render/update/destroy, live event logs, mode/debug toggles, and JSON payload editing.
+
+## Manual UX QA
+
+- Use `docs/ux-qa-matrix.md` to verify the 12 high-impact QoL upgrades on desktop and mobile.
+- It includes step-by-step scenarios, expected behavior, and a reusable QA log template.
+
+## PDF Benchmarking
+
+- Use `docs/pdf-engine-benchmark.md` to measure local PDF engine latency and output size.
+- Run benchmarks in dev from the builder toolbar lightning icon.
+
 ## Project Structure
 
 ```text
