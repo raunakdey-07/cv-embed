@@ -1062,6 +1062,48 @@ h4.skill-cat-title { margin: 0 0 6px; }
     padding: 0 12px;
   }
 
+  .two-pane.is-mobile-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    height: auto;
+  }
+
+  .mobile-view-switch {
+    position: sticky;
+    top: 6px;
+    z-index: 20;
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border-dim);
+    background: rgba(19, 20, 25, 0.92);
+    backdrop-filter: blur(8px);
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .mobile-view-tab {
+    border-radius: var(--r);
+    padding: 7px 11px;
+    font-family: 'Azeret Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-3);
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+
+  .mobile-view-tab.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .mobile-pane-enter {
+    animation: mobilePaneIn 0.2s ease;
+  }
+
   .app-main {
     padding: 8px;
   }
@@ -1109,6 +1151,17 @@ h4.skill-cat-title { margin: 0 0 6px; }
   .score-help-popover {
     width: min(240px, calc(100vw - 28px));
     right: 0;
+  }
+}
+
+@keyframes mobilePaneIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

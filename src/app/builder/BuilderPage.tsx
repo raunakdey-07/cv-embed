@@ -112,6 +112,8 @@ export function BuilderPage() {
   const [scoreGuideOpen, setScoreGuideOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
+  const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
+  const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
 
   useEffect(() => {
     saveDraft({ ...resume, meta: { ...resume.meta, updatedAt: new Date().toISOString() } })
@@ -129,6 +131,20 @@ export function BuilderPage() {
   useEffect(() => {
     localStorage.setItem('cv-embed:public-base-url', normalizeBaseUrl(embedBaseUrl))
   }, [embedBaseUrl])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)')
+    const onChange = (event: MediaQueryListEvent) => {
+      setIsMobileLayout(event.matches)
+      if (!event.matches) {
+        setMobileView('edit')
+      }
+    }
+
+    setIsMobileLayout(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
 
   useEffect(() => {
     if (!embedArtifacts) return
@@ -203,9 +219,36 @@ export function BuilderPage() {
   const sectionCls = (id: SectionId) =>
     `section-shell ${activeSection === id ? 'is-active' : 'is-compact'}`
 
+  const showEditPane = !isMobileLayout || mobileView === 'edit'
+  const showPreviewPane = !isMobileLayout || mobileView === 'preview'
+
   return (
-    <main className="app-main two-pane">
-      <section className="left-pane">
+    <main className={`app-main two-pane ${isMobileLayout ? 'is-mobile-layout' : ''}`}>
+      {isMobileLayout ? (
+        <div className="mobile-view-switch" role="tablist" aria-label="Mobile view switch">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileView === 'edit'}
+            className={`mobile-view-tab ${mobileView === 'edit' ? 'active' : ''}`}
+            onClick={() => setMobileView('edit')}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileView === 'preview'}
+            className={`mobile-view-tab ${mobileView === 'preview' ? 'active' : ''}`}
+            onClick={() => setMobileView('preview')}
+          >
+            Preview
+          </button>
+        </div>
+      ) : null}
+
+      {showEditPane ? (
+      <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
 
         {embedArtifacts ? (
@@ -290,8 +333,10 @@ export function BuilderPage() {
           <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />
         </div>
       </section>
+      ) : null}
 
-      <section className="right-pane panel">
+      {showPreviewPane ? (
+      <section className={`right-pane panel ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <div className="preview-head">
           <div className="preview-head-main">
             <IconEye size={16} />
@@ -357,6 +402,7 @@ export function BuilderPage() {
           <TemplateRenderer resume={resume} />
         </div>
       </section>
+      ) : null}
     </main>
   )
 }
