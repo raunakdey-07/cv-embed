@@ -261,30 +261,50 @@ export function BuilderPage() {
 
   const completion = useMemo(() => {
     const hasText = (value: string) => value.trim().length > 0
-    const skills = [
-      ...resume.skills.languages,
-      ...resume.skills.frameworks,
-      ...resume.skills.tools,
-      ...resume.skills.other,
-    ]
-    const uniqueSkillCount = new Set(skills.map((value) => value.trim().toLowerCase()).filter(Boolean)).size
 
-    const checks = [
-      hasText(resume.basics.name) && hasText(resume.basics.email) && hasText(resume.basics.phone),
-      hasText(resume.basics.summary),
-      resume.education.some((item) => [item.institution, item.degree, item.field].some(hasText)),
-      resume.experience.some((item) => [item.company, item.role].some(hasText) || item.bullets.some(hasText)),
-      resume.projects.some((item) => [item.title, item.projectLink, item.repoLink].some(hasText) || item.bullets.some(hasText)),
-      uniqueSkillCount >= 3,
+    const basicsChecks = [
+      hasText(resume.basics.name),
+      hasText(resume.basics.email),
+      hasText(resume.basics.phone),
+      hasText(resume.basics.location),
       resume.basics.links.some((item) => hasText(item.url)),
     ]
 
-    const done = checks.filter(Boolean).length
-    const total = checks.length
+    const essentialsDone = basicsChecks.filter(Boolean).length
+    const essentialsTotal = basicsChecks.length
+
+    const sectionCompletion = {
+      summary: hasText(resume.basics.summary),
+      education: resume.education.some((item) => [item.institution, item.degree, item.field].some(hasText)),
+      experience: resume.experience.some((item) => [item.company, item.role, item.location].some(hasText) || item.bullets.some(hasText)),
+      projects: resume.projects.some((item) => [item.title, item.projectLink, item.repoLink].some(hasText) || item.techStack.some(hasText) || item.bullets.some(hasText)),
+      skills: [
+        ...resume.skills.languages,
+        ...resume.skills.frameworks,
+        ...resume.skills.tools,
+        ...resume.skills.other,
+      ].some(hasText),
+      certifications: resume.certifications.some((item) => [item.title, item.issuer, item.date, item.credentialId, item.credentialUrl].some(hasText)),
+      accomplishments: resume.accomplishments.some((item) => [item.title, item.organization, item.location].some(hasText) || item.bullets.some(hasText)),
+      activities: resume.activities.some((item) => [item.role, item.organization, item.location, item.referenceUrl].some(hasText)),
+      volunteering: resume.volunteering.some((item) => [item.role, item.organization, item.location].some(hasText) || item.bullets.some(hasText)),
+      publications: resume.publications.some((item) => [item.title, item.venue, item.date, item.url].some(hasText)),
+    }
+
+    const visibleSections = Object.entries(resume.meta.documentOptions.showSections)
+      .filter(([, visible]) => visible)
+      .map(([section]) => section as keyof typeof sectionCompletion)
+
+    const blocksTotal = 1 + visibleSections.length
+    const blocksDone = (essentialsDone > 0 ? 1 : 0) + visibleSections.filter((section) => sectionCompletion[section]).length
+
     return {
-      done,
-      total,
-      percent: Math.round((done / total) * 100),
+      done: blocksDone,
+      total: blocksTotal,
+      percent: blocksTotal > 0 ? Math.round((blocksDone / blocksTotal) * 100) : 0,
+      essentialsDone,
+      essentialsTotal,
+      essentialsPercent: Math.round((essentialsDone / essentialsTotal) * 100),
     }
   }, [resume])
 
@@ -466,13 +486,14 @@ export function BuilderPage() {
 
         <div className="completion-strip" title="Live section completion based on core resume blocks">
           <div className="completion-head">
-            <span>Completion</span>
+            <span>Visible Blocks</span>
             <span>{completion.percent}%</span>
           </div>
           <div className="completion-track" aria-hidden>
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
           </div>
-          <div className="completion-meta">{completion.done}/{completion.total} core blocks complete</div>
+          <div className="completion-meta">{completion.done}/{completion.total} visible blocks complete</div>
+          <div className="completion-meta">Essentials: {completion.essentialsDone}/{completion.essentialsTotal} ({completion.essentialsPercent}%)</div>
         </div>
 
         {embedArtifacts ? (
