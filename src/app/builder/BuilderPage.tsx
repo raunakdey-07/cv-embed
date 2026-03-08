@@ -102,6 +102,7 @@ export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const exportRef = useRef<HTMLDivElement>(null)
   const scoreGuideRef = useRef<HTMLDivElement>(null)
+  const mobileActionsRef = useRef<HTMLDivElement>(null)
 
   const [resume, setResume] = useState<Resume>(() => loadDraft() ?? createEmptyResume())
   const [embedArtifacts, setEmbedArtifacts] = useState<EmbedArtifacts | null>(null)
@@ -109,6 +110,7 @@ export function BuilderPage() {
   const [copyState, setCopyState] = useState('')
   const [activeSection, setActiveSection] = useState<SectionId>('basics')
   const [exportOpen, setExportOpen] = useState(false)
+  const [mobileExportOpen, setMobileExportOpen] = useState(false)
   const [scoreGuideOpen, setScoreGuideOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
@@ -123,6 +125,7 @@ export function BuilderPage() {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
       if (scoreGuideRef.current && !scoreGuideRef.current.contains(e.target as Node)) setScoreGuideOpen(false)
+      if (mobileActionsRef.current && !mobileActionsRef.current.contains(e.target as Node)) setMobileExportOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -138,6 +141,7 @@ export function BuilderPage() {
       setIsMobileLayout(event.matches)
       if (!event.matches) {
         setMobileView('edit')
+        setMobileExportOpen(false)
       }
     }
 
@@ -185,12 +189,18 @@ export function BuilderPage() {
     setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume))
   }
 
+  const onToggleMobileView = () => {
+    setMobileView((view) => (view === 'edit' ? 'preview' : 'edit'))
+    setMobileExportOpen(false)
+  }
+
   const onDownloadPdf = async () => {
     try {
       setBusy(true)
       const { downloadResumePdf } = await import('../../pdf/pdfRenderer')
       await downloadResumePdf(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.pdf`)
       if (isMobileLayout) setMobileView('preview')
+      setMobileExportOpen(false)
     } finally {
       setBusy(false)
     }
@@ -202,6 +212,7 @@ export function BuilderPage() {
       const { downloadResumeDocx } = await import('../../docx/docxRenderer')
       await downloadResumeDocx(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.docx`)
       if (isMobileLayout) setMobileView('preview')
+      setMobileExportOpen(false)
     } finally {
       setBusy(false)
     }
@@ -210,6 +221,7 @@ export function BuilderPage() {
   const onDownloadJson = () => {
     downloadJson(resume)
     if (isMobileLayout) setMobileView('preview')
+    setMobileExportOpen(false)
   }
 
   const copyTo = async (label: string, value: string) => {
@@ -409,6 +421,40 @@ export function BuilderPage() {
           <TemplateRenderer resume={resume} />
         </div>
       </section>
+      ) : null}
+
+      {isMobileLayout ? (
+        <div className="mobile-bottom-actions-wrap" ref={mobileActionsRef}>
+          {mobileExportOpen ? (
+            <div className="mobile-export-sheet" role="menu" aria-label="Mobile export menu">
+              <button type="button" onClick={onDownloadPdf}><IconFileText size={14} /> PDF</button>
+              <button type="button" onClick={onDownloadDocx}><IconFileText size={14} /> DOCX</button>
+              <button type="button" onClick={onDownloadJson}><IconBraces size={14} /> JSON</button>
+            </div>
+          ) : null}
+
+          <div className="mobile-bottom-actions">
+            <button type="button" className="mobile-bottom-btn" onClick={onToggleMobileView}>
+              {mobileView === 'edit' ? <IconEye size={14} /> : <IconSliders size={14} />}
+              {mobileView === 'edit' ? 'Preview' : 'Edit'}
+            </button>
+            <button
+              type="button"
+              className={`mobile-bottom-btn ${mobileExportOpen ? 'active' : ''}`}
+              onClick={() => setMobileExportOpen((open) => !open)}
+              disabled={busy}
+            >
+              <IconDownload size={14} /> Export
+            </button>
+            <button
+              type="button"
+              className={`mobile-bottom-btn ${embedArtifacts ? 'active' : ''}`}
+              onClick={createEmbedLink}
+            >
+              <IconLink size={14} /> Embed
+            </button>
+          </div>
+        </div>
       ) : null}
     </main>
   )

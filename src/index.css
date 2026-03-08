@@ -1104,6 +1104,86 @@ h4.skill-cat-title { margin: 0 0 6px; }
     animation: mobilePaneIn 0.2s ease;
   }
 
+  .mobile-bottom-actions-wrap {
+    position: sticky;
+    bottom: 8px;
+    z-index: 25;
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .mobile-export-sheet {
+    display: grid;
+    gap: 4px;
+    padding: 6px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border);
+    background: rgba(19, 20, 25, 0.95);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-export-sheet button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--r);
+    color: var(--text-2);
+    font-family: 'Azeret Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .mobile-export-sheet button:hover {
+    color: var(--text);
+    background: var(--accent-dim);
+  }
+
+  .mobile-bottom-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border);
+    background: rgba(19, 20, 25, 0.95);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-bottom-btn {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: var(--r);
+    color: var(--text-2);
+    font-family: 'Azeret Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+
+  .mobile-bottom-btn.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .mobile-bottom-btn:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  .mobile-bottom-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
   .app-main {
     padding: 8px;
   }
