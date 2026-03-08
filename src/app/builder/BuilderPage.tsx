@@ -87,6 +87,20 @@ const SECTION_NAV: { id: SectionId; Icon: (p: { size?: number }) => React.ReactN
   { id: 'publications', Icon: IconFileText, label: 'Publications' },
 ]
 
+const SECTION_LABELS: Record<SectionId, string> = {
+  basics: 'Basics',
+  'document-options': 'Format',
+  education: 'Education',
+  experience: 'Experience',
+  projects: 'Projects',
+  skills: 'Skills',
+  certifications: 'Certifications',
+  accomplishments: 'Accomplishments',
+  activities: 'Activities',
+  volunteering: 'Volunteering',
+  publications: 'Publications',
+}
+
 function getSectionFromIssue(issue: string): SectionId {
   const value = issue.toLowerCase()
   if (value.includes('basics')) return 'basics'
@@ -254,6 +268,11 @@ export function BuilderPage() {
       severity,
       title: details.length > 0 ? details.join('\n') : 'No validation issues',
     }
+  }, [validation.errors, validation.warnings])
+
+  const nextIssueSection = useMemo(() => {
+    const issue = validation.errors[0] ?? validation.warnings[0]
+    return issue ? getSectionFromIssue(issue) : null
   }, [validation.errors, validation.warnings])
 
   const completion = useMemo(() => {
@@ -511,25 +530,43 @@ export function BuilderPage() {
           <div className="completion-track" aria-hidden>
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
           </div>
-          <div className="completion-foot">
-            <span className={`completion-pill ${completion.firstMissingEssentialSection ? 'warn' : 'ok'}`}>
-              <IconCheck size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
-            </span>
-          </div>
-          <div className="completion-actions">
-            <span className={`issues-pill ${issueSummary.severity}`} title={issueSummary.title}>
-              {issueSummary.label}
-            </span>
-            {(validation.errors.length > 0 || validation.warnings.length > 0) ? (
+          <div className="completion-pills">
+            <div className="completion-pill-wrap" tabIndex={0} aria-label="Essentials guidance">
+              <span className={`completion-pill ${completion.firstMissingEssentialSection ? 'warn' : 'ok'}`}>
+                <IconCheck size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
+              </span>
+              <div className="completion-pill-popover" role="tooltip">
+                {completion.firstMissingEssentialSection
+                  ? `Next action: complete ${SECTION_LABELS[completion.firstMissingEssentialSection]}.`
+                  : 'Essentials complete. Next action: tighten bullets and links for stronger scoring.'}
+              </div>
+            </div>
+            {issueSummary.total > 0 ? (
+              <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
               <button
                 type="button"
-                className="tool-btn jump-issue-btn"
+                className={`completion-pill completion-pill-action ${issueSummary.severity === 'errors' ? 'error' : 'warn'}`}
                 title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
                 onClick={jumpToFirstIssue}
               >
-                <IconAlertTriangle size={12} /> Fix next
+                <IconAlertTriangle size={10} /> {issueSummary.label} · Fix next
               </button>
-            ) : null}
+                <div className="completion-pill-popover" role="tooltip">
+                  {nextIssueSection
+                    ? `Next action: fix ${SECTION_LABELS[nextIssueSection]} issues first. Click this pill to jump.`
+                    : 'Next action: fix listed validation issues. Click this pill to jump.'}
+                </div>
+              </div>
+            ) : (
+              <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
+                <span className="completion-pill ok">
+                  <IconCheck size={10} /> Issues clean
+                </span>
+                <div className="completion-pill-popover" role="tooltip">
+                  No validation issues right now. Next action: add measurable outcomes to improve overall quality.
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
