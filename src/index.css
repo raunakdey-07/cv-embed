@@ -301,33 +301,11 @@ button {
 .err-badge  { background: var(--red-dim);    color: var(--red); }
 .warn-badge { background: var(--orange-dim); color: var(--orange); }
 
-.score-help-wrap {
+.score-hover-wrap {
   position: relative;
   display: inline-flex;
   align-items: center;
-}
-
-.score-help-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  line-height: 1;
-  border-radius: 999px;
-  font-family: 'Azeret Mono', monospace;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-3);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
-}
-
-.score-help-btn:hover {
-  color: var(--text);
-  border-color: var(--accent-mid);
-  background: var(--surface-3);
+  outline: none;
 }
 
 .score-help-popover {
@@ -341,6 +319,17 @@ button {
   padding: 8px 10px;
   z-index: 45;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.score-hover-wrap:hover .score-help-popover,
+.score-hover-wrap:focus-within .score-help-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .score-help-title {

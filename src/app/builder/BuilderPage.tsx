@@ -150,7 +150,6 @@ function downloadJson(resume: Resume): void {
 export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const exportRef = useRef<HTMLDivElement>(null)
-  const scoreGuideRef = useRef<HTMLDivElement>(null)
   const mobileActionsRef = useRef<HTMLDivElement>(null)
 
   const [resume, setResume] = useState<Resume>(() => loadDraft() ?? createEmptyResume())
@@ -160,7 +159,6 @@ export function BuilderPage() {
   const [activeSection, setActiveSection] = useState<SectionId>('basics')
   const [exportOpen, setExportOpen] = useState(false)
   const [mobileExportOpen, setMobileExportOpen] = useState(false)
-  const [scoreGuideOpen, setScoreGuideOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
   const [embedPreset, setEmbedPreset] = useState<EmbedPreset>('placement')
@@ -191,7 +189,6 @@ export function BuilderPage() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
-      if (scoreGuideRef.current && !scoreGuideRef.current.contains(e.target as Node)) setScoreGuideOpen(false)
       if (mobileActionsRef.current && !mobileActionsRef.current.contains(e.target as Node)) setMobileExportOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -695,28 +692,18 @@ export function BuilderPage() {
               <span className={`issues-pill ${issueSummary.severity}`} title={issueSummary.title}>
                 {issueSummary.label}
               </span>
-              <span className="score-pill" title="Validation score out of 100">Score: {validation.score}/100</span>
-              <div className="score-help-wrap" ref={scoreGuideRef}>
-                <button
-                  type="button"
-                  className="score-help-btn"
-                  title="View scoring rubric"
-                  onClick={() => setScoreGuideOpen((open) => !open)}
-                >
-                  ?
-                </button>
-                {scoreGuideOpen ? (
-                  <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
-                    <p className="score-help-title">Scoring Rubric</p>
-                    <ul>
-                      <li><strong>Essentials:</strong> Basics core, Education, Experience/Projects, Skills (3+), Accomplishments</li>
-                      <li><strong>Projects:</strong> still strongly preferred for profile depth</li>
-                      <li><strong>Errors:</strong> high score penalty</li>
-                      <li><strong>Warnings:</strong> moderate penalty</li>
-                      <li><strong>Bonuses:</strong> summary, links, depth</li>
-                    </ul>
-                  </div>
-                ) : null}
+              <div className="score-hover-wrap" tabIndex={0} aria-label="Scoring rubric">
+                <span className="score-pill" title="Validation score out of 100">Score: {validation.score}/100</span>
+                <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
+                  <p className="score-help-title">Scoring Rubric</p>
+                  <ul>
+                    <li><strong>Essentials:</strong> Basics core, Education, Experience/Projects, Skills (3+), Accomplishments</li>
+                    <li><strong>Projects:</strong> still strongly preferred for profile depth</li>
+                    <li><strong>Errors:</strong> high score penalty</li>
+                    <li><strong>Warnings:</strong> moderate penalty</li>
+                    <li><strong>Bonuses:</strong> summary, links, depth</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
