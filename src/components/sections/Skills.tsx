@@ -23,7 +23,7 @@ function SkillCategoryEditor({ title, values, onChange }: { title: string; value
     <div className="card skill-category">
       <h4 className="skill-cat-title">{title}</h4>
       <div className="skill-input-row">
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} placeholder={`Add ${title.toLowerCase()}`} />
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} placeholder={`Add ${title.toLowerCase()} (press Enter)`} />
         <button type="button" className="ghost-add" title="Add" onClick={add}><IconPlus size={12} /></button>
       </div>
       {values.length > 0 ? (

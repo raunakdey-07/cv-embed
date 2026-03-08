@@ -28,14 +28,14 @@ export function EducationSection({ education, onChange }: EducationSectionProps)
           <div className="card" key={`edu-${i}`}>
             <button type="button" className="card-close" title="Remove" onClick={() => remove(i)}><IconX size={12} /></button>
             <div className="field-grid">
-              <label>Institution <input value={item.institution} onChange={(e) => update(i, 'institution', e.target.value)} /></label>
-              <label>Degree <input value={item.degree} onChange={(e) => update(i, 'degree', e.target.value)} /></label>
-              <label>Field <input value={item.field} onChange={(e) => update(i, 'field', e.target.value)} /></label>
-              <label>CGPA <input value={item.cgpa} onChange={(e) => update(i, 'cgpa', e.target.value)} /></label>
-              <label>Start <input value={item.startDate} onChange={(e) => update(i, 'startDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
-              <label>End <input value={item.endDate} onChange={(e) => update(i, 'endDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
+              <label>Institution <input value={item.institution} onChange={(e) => update(i, 'institution', e.target.value)} placeholder="e.g. University of Washington" /></label>
+              <label>Degree <input value={item.degree} onChange={(e) => update(i, 'degree', e.target.value)} placeholder="e.g. B.Tech" /></label>
+              <label>Field <input value={item.field} onChange={(e) => update(i, 'field', e.target.value)} placeholder="e.g. Computer Science" /></label>
+              <label>CGPA <input value={item.cgpa} onChange={(e) => update(i, 'cgpa', e.target.value)} placeholder="e.g. 8.7/10" /></label>
+              <label>Start <input value={item.startDate} onChange={(e) => update(i, 'startDate', e.target.value)} placeholder="e.g. Jan 2024 or 2024-01" /></label>
+              <label>End <input value={item.endDate} onChange={(e) => update(i, 'endDate', e.target.value)} placeholder="e.g. Present or 2026-05" /></label>
             </div>
-            <label>Location <input value={item.location} onChange={(e) => update(i, 'location', e.target.value)} /></label>
+            <label>Location <input value={item.location} onChange={(e) => update(i, 'location', e.target.value)} placeholder="e.g. Seattle, WA" /></label>
           </div>
         ))}
       </div>

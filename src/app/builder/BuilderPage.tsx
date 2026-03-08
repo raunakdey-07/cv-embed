@@ -83,6 +83,21 @@ const SECTION_NAV: { id: SectionId; Icon: (p: { size?: number }) => React.ReactN
   { id: 'publications', Icon: IconFileText, label: 'Publications' },
 ]
 
+function getSectionFromIssue(issue: string): SectionId {
+  const value = issue.toLowerCase()
+  if (value.includes('basics')) return 'basics'
+  if (value.includes('education')) return 'education'
+  if (value.includes('experience')) return 'experience'
+  if (value.includes('projects') || value.includes('project')) return 'projects'
+  if (value.includes('skills') || value.includes('skill')) return 'skills'
+  if (value.includes('certifications') || value.includes('certification')) return 'certifications'
+  if (value.includes('accomplishments') || value.includes('accomplishment')) return 'accomplishments'
+  if (value.includes('activities') || value.includes('activity')) return 'activities'
+  if (value.includes('volunteering') || value.includes('volunteer')) return 'volunteering'
+  if (value.includes('publications') || value.includes('publication')) return 'publications'
+  return 'basics'
+}
+
 interface EmbedArtifacts {
   portableUrl: string
   iframeSnippet: string
@@ -298,6 +313,21 @@ export function BuilderPage() {
   const sectionCls = (id: SectionId) =>
     `section-shell ${activeSection === id ? 'is-active' : 'is-compact'}`
 
+  const jumpToFirstIssue = useCallback(() => {
+    const issue = validation.errors[0] ?? validation.warnings[0]
+    if (!issue) return
+
+    const section = getSectionFromIssue(issue)
+    if (isMobileLayout) {
+      setMobileView('edit')
+    }
+
+    setActiveSection(section)
+    requestAnimationFrame(() => {
+      document.getElementById(`section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }, [isMobileLayout, validation.errors, validation.warnings])
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const withCommand = event.metaKey || event.ctrlKey
@@ -322,12 +352,18 @@ export function BuilderPage() {
       if (event.shiftKey && key === 'p' && isMobileLayout) {
         event.preventDefault()
         onToggleMobileView()
+        return
+      }
+
+      if (event.shiftKey && key === 'j') {
+        event.preventDefault()
+        jumpToFirstIssue()
       }
     }
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [busy, createEmbedLink, isMobileLayout, onToggleMobileView, onDownloadPdf])
+  }, [busy, createEmbedLink, isMobileLayout, jumpToFirstIssue, onToggleMobileView, onDownloadPdf])
 
   const showEditPane = !isMobileLayout || mobileView === 'edit'
   const showPreviewPane = !isMobileLayout || mobileView === 'preview'
@@ -491,6 +527,16 @@ export function BuilderPage() {
                 ) : null}
               </div>
               <div className="toolbar-sep" />
+              {(validation.errors.length > 0 || validation.warnings.length > 0) ? (
+                <button
+                  type="button"
+                  className="tool-btn jump-issue-btn"
+                  title="Jump to first issue (Ctrl/Cmd+Shift+J)"
+                  onClick={jumpToFirstIssue}
+                >
+                  <IconAlertTriangle size={12} /> Fix first
+                </button>
+              ) : null}
               <div className={`status-dot ${validation.valid ? 'valid' : 'invalid'}`} title={validation.valid ? 'Validation: no errors' : `Validation errors:\n${validation.errors.join('\n')}`}>
                 {validation.valid ? <IconCheck size={12} /> : <IconXCircle size={12} />}
               </div>

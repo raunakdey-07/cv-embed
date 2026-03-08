@@ -41,7 +41,7 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
         </label>
         <label>
           Headline
-          <input value={basics.headline} onChange={(e) => onChange({ ...basics, headline: e.target.value })} placeholder="Frontend Engineer | ML Enthusiast" />
+          <input value={basics.headline} onChange={(e) => onChange({ ...basics, headline: e.target.value })} placeholder="e.g. Software Engineer | Backend Systems" />
         </label>
         <label>
           Email
@@ -58,7 +58,7 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
       </div>
       <label>
         Summary
-        <textarea rows={3} value={basics.summary} onChange={(e) => onChange({ ...basics, summary: e.target.value })} placeholder="2–3 line professional summary" />
+        <textarea rows={3} value={basics.summary} onChange={(e) => onChange({ ...basics, summary: e.target.value })} placeholder="2-3 lines on experience, domain, and impact" />
       </label>
 
       <div className="section-head sub">
@@ -102,7 +102,7 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
               {showCustomLabel ? (
                 <label>
                   Custom Label
-                  <input value={link.label === 'Other' ? '' : link.label} onChange={(e) => updateLink(index, 'label', e.target.value)} placeholder="Platform name" />
+                  <input value={link.label === 'Other' ? '' : link.label} onChange={(e) => updateLink(index, 'label', e.target.value)} placeholder="e.g. Portfolio" />
                 </label>
               ) : null}
             </div>

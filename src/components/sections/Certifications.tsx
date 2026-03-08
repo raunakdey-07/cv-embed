@@ -28,11 +28,11 @@ export function CertificationsSection({ certifications, onChange }: Certificatio
           <div className="card" key={`cert-${i}`}>
             <button type="button" className="card-close" title="Remove" onClick={() => remove(i)}><IconX size={12} /></button>
             <div className="field-grid">
-              <label>Title <input value={item.title} onChange={(e) => update(i, 'title', e.target.value)} /></label>
-              <label>Issuer <input value={item.issuer} onChange={(e) => update(i, 'issuer', e.target.value)} /></label>
-              <label>Date <input value={item.date} onChange={(e) => update(i, 'date', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
-              <label>Credential ID <input value={item.credentialId} onChange={(e) => update(i, 'credentialId', e.target.value)} /></label>
-              <label>Credential URL <input value={item.credentialUrl} onChange={(e) => update(i, 'credentialUrl', e.target.value)} placeholder="https://..." /></label>
+              <label>Title <input value={item.title} onChange={(e) => update(i, 'title', e.target.value)} placeholder="e.g. AWS Certified Developer" /></label>
+              <label>Issuer <input value={item.issuer} onChange={(e) => update(i, 'issuer', e.target.value)} placeholder="e.g. Amazon Web Services" /></label>
+              <label>Date <input value={item.date} onChange={(e) => update(i, 'date', e.target.value)} placeholder="e.g. Mar 2025 or 2025-03" /></label>
+              <label>Credential ID <input value={item.credentialId} onChange={(e) => update(i, 'credentialId', e.target.value)} placeholder="e.g. ABCD-1234" /></label>
+              <label>Credential URL <input value={item.credentialUrl} onChange={(e) => update(i, 'credentialUrl', e.target.value)} placeholder="https://issuer.example.com/verify" /></label>
             </div>
           </div>
         ))}

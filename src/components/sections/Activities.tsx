@@ -28,12 +28,12 @@ export function ActivitiesSection({ activities, onChange }: ActivitiesSectionPro
           <div className="card" key={`act-${i}`}>
             <button type="button" className="card-close" title="Remove" onClick={() => remove(i)}><IconX size={12} /></button>
             <div className="field-grid">
-              <label>Role <input value={item.role} onChange={(e) => update(i, 'role', e.target.value)} /></label>
-              <label>Organization <input value={item.organization} onChange={(e) => update(i, 'organization', e.target.value)} /></label>
-              <label>Start <input value={item.startDate} onChange={(e) => update(i, 'startDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
-              <label>End <input value={item.endDate} onChange={(e) => update(i, 'endDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
-              <label>Location <input value={item.location} onChange={(e) => update(i, 'location', e.target.value)} /></label>
-              <label>Reference URL <input value={item.referenceUrl} onChange={(e) => update(i, 'referenceUrl', e.target.value)} placeholder="https://..." /></label>
+              <label>Role <input value={item.role} onChange={(e) => update(i, 'role', e.target.value)} placeholder="e.g. Core Team Member" /></label>
+              <label>Organization <input value={item.organization} onChange={(e) => update(i, 'organization', e.target.value)} placeholder="e.g. Robotics Club" /></label>
+              <label>Start <input value={item.startDate} onChange={(e) => update(i, 'startDate', e.target.value)} placeholder="e.g. Jan 2024 or 2024-01" /></label>
+              <label>End <input value={item.endDate} onChange={(e) => update(i, 'endDate', e.target.value)} placeholder="e.g. Present or 2025-06" /></label>
+              <label>Location <input value={item.location} onChange={(e) => update(i, 'location', e.target.value)} placeholder="e.g. Campus / Remote" /></label>
+              <label>Reference URL <input value={item.referenceUrl} onChange={(e) => update(i, 'referenceUrl', e.target.value)} placeholder="https://example.com/certificate" /></label>
             </div>
           </div>
         ))}

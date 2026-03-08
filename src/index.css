@@ -221,6 +221,22 @@ button {
   cursor: not-allowed;
 }
 
+.jump-issue-btn {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--orange);
+  padding: 5px 8px;
+}
+
+.jump-issue-btn:hover {
+  border-color: var(--orange);
+  background: var(--orange-dim);
+}
+
 /* status in toolbar */
 .status-dot {
   display: inline-flex;
