@@ -38,10 +38,10 @@ export function PublicationsSection({ publications, onChange }: PublicationsSect
           <div className="card" key={`pub-${index}`}>
             <button type="button" className="card-close" title="Remove" onClick={() => remove(index)}><IconX size={12} /></button>
             <div className="field-grid">
-              <label>Title <input value={item.title} onChange={(e) => update(index, 'title', e.target.value)} placeholder="e.g. Efficient LLM Fine-tuning" /></label>
-              <label>Venue / Journal <input value={item.venue} onChange={(e) => update(index, 'venue', e.target.value)} placeholder="e.g. IEEE Access" /></label>
-              <label>Date <input value={item.date} onChange={(e) => update(index, 'date', e.target.value)} placeholder="e.g. Aug 2025 or 2025-08" /></label>
-              <label>URL <input value={item.url} onChange={(e) => update(index, 'url', e.target.value)} placeholder="https://doi.org/..." /></label>
+              <label>Title <input value={item.title} onChange={(e) => update(index, 'title', e.target.value)} /></label>
+              <label>Venue / Journal <input value={item.venue} onChange={(e) => update(index, 'venue', e.target.value)} /></label>
+              <label>Date <input value={item.date} onChange={(e) => update(index, 'date', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
+              <label>URL <input value={item.url} onChange={(e) => update(index, 'url', e.target.value)} placeholder="https://..." /></label>
             </div>
           </div>
         ))}

@@ -46,16 +46,16 @@ export function AccomplishmentsSection({ accomplishments, onChange }: Accomplish
           <div className="card" key={`acc-${i}`}>
             <button type="button" className="card-close" title="Remove" onClick={() => remove(i)}><IconX size={12} /></button>
             <div className="field-grid">
-              <label>Title <input value={item.title} onChange={(e) => update(i, 'title', e.target.value)} placeholder="e.g. Winner, National Hackathon" /></label>
-              <label>Organization <input value={item.organization} onChange={(e) => update(i, 'organization', e.target.value)} placeholder="e.g. IEEE" /></label>
-              <label>Start <input value={item.startDate} onChange={(e) => update(i, 'startDate', e.target.value)} placeholder="e.g. Jan 2024 or 2024-01" /></label>
-              <label>End <input value={item.endDate} onChange={(e) => update(i, 'endDate', e.target.value)} placeholder="e.g. Mar 2024 or 2024-03" /></label>
-              <label>Location <input value={item.location} onChange={(e) => update(i, 'location', e.target.value)} placeholder="e.g. Delhi, India" /></label>
+              <label>Title <input value={item.title} onChange={(e) => update(i, 'title', e.target.value)} /></label>
+              <label>Organization <input value={item.organization} onChange={(e) => update(i, 'organization', e.target.value)} /></label>
+              <label>Start <input value={item.startDate} onChange={(e) => update(i, 'startDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
+              <label>End <input value={item.endDate} onChange={(e) => update(i, 'endDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
+              <label>Location <input value={item.location} onChange={(e) => update(i, 'location', e.target.value)} /></label>
             </div>
             <div className="bullet-group">
               {item.bullets.map((b, bi) => (
                 <div className="bullet-row" key={`acc-${i}-b-${bi}`}>
-                  <textarea rows={2} value={b} onChange={(e) => updateBullet(i, bi, e.target.value)} placeholder={`e.g. Highlight achievement ${bi + 1} with context`} />
+                  <textarea rows={2} value={b} onChange={(e) => updateBullet(i, bi, e.target.value)} placeholder={`Bullet ${bi + 1}`} />
                   <button type="button" className="bullet-dismiss" title="Remove bullet" onClick={() => removeBullet(i, bi)}><IconX size={10} /></button>
                 </div>
               ))}

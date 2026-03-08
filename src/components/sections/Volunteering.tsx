@@ -70,11 +70,11 @@ export function VolunteeringSection({ volunteering, onChange }: VolunteeringSect
           <div className="card" key={`vol-${index}`}>
             <button type="button" className="card-close" title="Remove" onClick={() => remove(index)}><IconX size={12} /></button>
             <div className="field-grid">
-              <label>Role <input value={item.role} onChange={(e) => update(index, 'role', e.target.value)} placeholder="e.g. Volunteer Mentor" /></label>
-              <label>Organization <input value={item.organization} onChange={(e) => update(index, 'organization', e.target.value)} placeholder="e.g. Red Cross" /></label>
-              <label>Start <input value={item.startDate} onChange={(e) => update(index, 'startDate', e.target.value)} placeholder="e.g. Jan 2024 or 2024-01" /></label>
-              <label>End <input value={item.endDate} onChange={(e) => update(index, 'endDate', e.target.value)} placeholder="e.g. Present or 2025-04" /></label>
-              <label>Location <input value={item.location} onChange={(e) => update(index, 'location', e.target.value)} placeholder="e.g. Pune, India" /></label>
+              <label>Role <input value={item.role} onChange={(e) => update(index, 'role', e.target.value)} /></label>
+              <label>Organization <input value={item.organization} onChange={(e) => update(index, 'organization', e.target.value)} /></label>
+              <label>Start <input value={item.startDate} onChange={(e) => update(index, 'startDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
+              <label>End <input value={item.endDate} onChange={(e) => update(index, 'endDate', e.target.value)} placeholder="YYYY-MM or MMM YYYY" /></label>
+              <label>Location <input value={item.location} onChange={(e) => update(index, 'location', e.target.value)} /></label>
             </div>
             <div className="bullet-group">
               {item.bullets.map((bullet, bulletIndex) => (
@@ -83,7 +83,7 @@ export function VolunteeringSection({ volunteering, onChange }: VolunteeringSect
                     rows={2}
                     value={bullet}
                     onChange={(e) => updateBullet(index, bulletIndex, e.target.value)}
-                    placeholder={`e.g. Volunteering impact bullet ${bulletIndex + 1}`}
+                    placeholder={`Bullet ${bulletIndex + 1}`}
                   />
                   <button type="button" className="bullet-dismiss" title="Remove bullet" onClick={() => removeBullet(index, bulletIndex)}>
                     <IconX size={10} />

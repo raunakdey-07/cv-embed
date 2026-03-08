@@ -53,15 +53,19 @@ function getDefaultEmbedBaseUrl(): string {
   return normalizeBaseUrl(window.location.origin)
 }
 
-function buildEmbedArtifacts(baseUrl: string, resume: Resume): EmbedArtifacts {
+function buildEmbedArtifacts(baseUrl: string, resume: Resume, options: EmbedBuildOptions): EmbedArtifacts {
   const origin = normalizeBaseUrl(baseUrl) || getDefaultEmbedBaseUrl()
   const encoded = encodeResumeForUrl(resume)
   const portable = new URL('/embed/portable', origin)
   portable.searchParams.set('data', encoded)
+  if (!options.showDownload) {
+    portable.searchParams.set('showDownload', '0')
+  }
   const portableUrl = portable.toString()
-  const iframeSnippet = `<iframe src="${portableUrl}" width="100%" height="1100" frameborder="0"></iframe>`
-  const sdkSnippet = `<script src="${origin}/sdk.js"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${JSON.stringify(resume, null, 2)},\n    options: { showDownload: false }\n  });\n</script>`
-  return { portableUrl, iframeSnippet, sdkSnippet }
+  const iframeSnippet = `<iframe src="${portableUrl}" width="100%" height="${options.iframeHeight}" frameborder="0" loading="lazy" title="Resume"></iframe>`
+  const sdkSnippet = `<script src="${origin}/sdk.js"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${JSON.stringify(resume, null, 2)},\n    height: ${options.iframeHeight},\n    options: { showDownload: ${options.showDownload ? 'true' : 'false'} }\n  });\n</script>`
+  const reactSnippet = `<iframe src="${portableUrl}" style={{ width: '100%', height: '${options.iframeHeight}px', border: 0 }} loading="lazy" title="Resume" />`
+  return { portableUrl, iframeSnippet, sdkSnippet, reactSnippet }
 }
 
 type SectionId =
@@ -102,6 +106,12 @@ interface EmbedArtifacts {
   portableUrl: string
   iframeSnippet: string
   sdkSnippet: string
+  reactSnippet: string
+}
+
+interface EmbedBuildOptions {
+  iframeHeight: number
+  showDownload: boolean
 }
 
 function formatRelativeTime(from: number, to: number): string {
@@ -141,6 +151,8 @@ export function BuilderPage() {
   const [scoreGuideOpen, setScoreGuideOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
+  const [embedIframeHeight, setEmbedIframeHeight] = useState(1100)
+  const [embedShowDownload, setEmbedShowDownload] = useState(false)
   const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
   const [saveState, setSaveState] = useState<'saving' | 'saved'>('saved')
@@ -194,8 +206,11 @@ export function BuilderPage() {
 
   useEffect(() => {
     if (!embedArtifacts) return
-    setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume))
-  }, [embedArtifacts, embedBaseUrl, resume])
+    setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume, {
+      iframeHeight: embedIframeHeight,
+      showDownload: embedShowDownload,
+    }))
+  }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
 
   useEffect(() => {
     let cancelled = false
@@ -261,8 +276,11 @@ export function BuilderPage() {
       return
     }
 
-    setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume))
-  }, [embedArtifacts, embedBaseUrl, resume])
+    setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume, {
+      iframeHeight: embedIframeHeight,
+      showDownload: embedShowDownload,
+    }))
+  }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
 
   const onToggleMobileView = useCallback(() => {
     setMobileView((view) => (view === 'edit' ? 'preview' : 'edit'))
@@ -420,6 +438,34 @@ export function BuilderPage() {
                 placeholder="https://cv-embed.vercel.app"
               />
             </div>
+            <div className="embed-row embed-config-row">
+              <label className="embed-config-item">
+                <span className="embed-label">Height</span>
+                <input
+                  className="embed-height-input"
+                  type="number"
+                  min={600}
+                  max={2400}
+                  step={50}
+                  value={embedIframeHeight}
+                  onChange={(event) => {
+                    const parsed = Number.parseInt(event.target.value, 10)
+                    if (Number.isNaN(parsed)) return
+                    setEmbedIframeHeight(Math.max(600, Math.min(2400, parsed)))
+                  }}
+                />
+              </label>
+              <label className="embed-config-item embed-toggle-item">
+                <span className="embed-label">Download</span>
+                <input
+                  type="checkbox"
+                  checked={embedShowDownload}
+                  onChange={(event) => setEmbedShowDownload(event.target.checked)}
+                />
+                <span className="embed-toggle-text">{embedShowDownload ? 'Shown' : 'Hidden'}</span>
+              </label>
+            </div>
+            <p className="embed-tip">Use `iframe` for no-code portals, `react` for JSX apps, and `sdk` for dynamic data rendering.</p>
             <div className="embed-row">
               <span className="embed-label">Embed URL</span>
               <span className="embed-url" title={embedArtifacts.portableUrl}>{embedArtifacts.portableUrl}</span>
@@ -427,6 +473,7 @@ export function BuilderPage() {
               <button type="button" className="tool-btn" onClick={() => copyTo('Embed URL', embedArtifacts.portableUrl)}><IconCopy size={11} /></button>
             </div>
             <div className="embed-row"><span className="embed-label">iframe</span><button type="button" className="tool-btn" onClick={() => copyTo('iframe', embedArtifacts.iframeSnippet)}><IconCopy size={11} /></button></div>
+            <div className="embed-row"><span className="embed-label">react</span><button type="button" className="tool-btn" onClick={() => copyTo('React iframe', embedArtifacts.reactSnippet)}><IconCopy size={11} /></button></div>
             <div className="embed-row"><span className="embed-label">sdk</span><button type="button" className="tool-btn" onClick={() => copyTo('SDK snippet', embedArtifacts.sdkSnippet)}><IconCopy size={11} /></button></div>
             {copyState ? <span className="copy-toast"><IconCheck size={11} /> {copyState}</span> : null}
           </div>

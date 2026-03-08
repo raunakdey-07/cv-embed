@@ -397,6 +397,41 @@ button {
   gap: 6px;
 }
 
+.embed-config-row {
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.embed-config-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.embed-height-input {
+  width: 86px;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 4px 6px;
+}
+
+.embed-toggle-item input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.embed-toggle-text {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .embed-base-input {
   min-width: 0;
   flex: 1;
@@ -447,6 +482,13 @@ button {
   font-size: 10px;
   color: var(--green);
   font-weight: 600;
+}
+
+.embed-tip {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--text-3);
+  line-height: 1.35;
 }
 
 .completion-strip {
@@ -1303,6 +1345,15 @@ h4.skill-cat-title { margin: 0 0 6px; }
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 6px;
+  }
+
+  .embed-config-row {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .embed-height-input {
+    width: 100px;
   }
 
   .embed-label {
