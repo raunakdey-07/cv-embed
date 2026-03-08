@@ -190,6 +190,7 @@ export function BuilderPage() {
       setBusy(true)
       const { downloadResumePdf } = await import('../../pdf/pdfRenderer')
       await downloadResumePdf(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.pdf`)
+      if (isMobileLayout) setMobileView('preview')
     } finally {
       setBusy(false)
     }
@@ -200,9 +201,15 @@ export function BuilderPage() {
       setBusy(true)
       const { downloadResumeDocx } = await import('../../docx/docxRenderer')
       await downloadResumeDocx(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.docx`)
+      if (isMobileLayout) setMobileView('preview')
     } finally {
       setBusy(false)
     }
+  }
+
+  const onDownloadJson = () => {
+    downloadJson(resume)
+    if (isMobileLayout) setMobileView('preview')
   }
 
   const copyTo = async (label: string, value: string) => {
@@ -362,7 +369,7 @@ export function BuilderPage() {
                   <div className="export-dropdown">
                     <button type="button" onClick={async () => { await onDownloadPdf(); setExportOpen(false) }}><IconFileText size={14} /> PDF</button>
                     <button type="button" onClick={async () => { await onDownloadDocx(); setExportOpen(false) }}><IconFileText size={14} /> DOCX</button>
-                    <button type="button" onClick={() => { downloadJson(resume); setExportOpen(false) }}><IconBraces size={14} /> JSON</button>
+                    <button type="button" onClick={() => { onDownloadJson(); setExportOpen(false) }}><IconBraces size={14} /> JSON</button>
                   </div>
                 ) : null}
               </div>
