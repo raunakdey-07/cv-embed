@@ -359,7 +359,7 @@ function percentile(values: number[], pct: number): number {
 }
 
 export interface PdfBenchmarkStats {
-  engine: 'react-pdf'
+  engine: 'react-pdf' | 'chromium' | 'remote'
   iterations: number
   minMs: number
   maxMs: number
@@ -369,6 +369,13 @@ export interface PdfBenchmarkStats {
   avgSizeKb: number
   avgHeadingCoveragePct: number
   samplesMs: number[]
+}
+
+export interface PdfEngineComparison {
+  local: PdfBenchmarkStats
+  remote?: PdfBenchmarkStats
+  deltaAvgMs?: number
+  deltaP50Ms?: number
 }
 
 function expectedSectionHeadings(resume: Resume): string[] {
@@ -427,6 +434,60 @@ export async function benchmarkReactPdfEngine(resume: Resume, iterations = 3): P
     avgSizeKb: runs > 0 ? totalKb / runs : 0,
     avgHeadingCoveragePct: runs > 0 ? totalCoverage / runs : 0,
     samplesMs,
+  }
+}
+
+export async function benchmarkRemotePdfEngine(
+  resume: Resume,
+  endpoint: string,
+  iterations = 3,
+): Promise<PdfBenchmarkStats> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ resume, iterations }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Remote benchmark failed: ${response.status}`)
+  }
+
+  const data = await response.json() as Partial<PdfBenchmarkStats>
+  if (typeof data.avgMs !== 'number' || typeof data.p50Ms !== 'number') {
+    throw new Error('Remote benchmark payload invalid')
+  }
+
+  return {
+    engine: data.engine === 'chromium' ? 'chromium' : 'remote',
+    iterations: data.iterations ?? iterations,
+    minMs: data.minMs ?? data.avgMs,
+    maxMs: data.maxMs ?? data.avgMs,
+    avgMs: data.avgMs,
+    p50Ms: data.p50Ms,
+    p95Ms: data.p95Ms ?? data.p50Ms,
+    avgSizeKb: data.avgSizeKb ?? 0,
+    avgHeadingCoveragePct: data.avgHeadingCoveragePct ?? 0,
+    samplesMs: data.samplesMs ?? [],
+  }
+}
+
+export async function comparePdfEngines(
+  resume: Resume,
+  remoteEndpoint?: string,
+  iterations = 3,
+): Promise<PdfEngineComparison> {
+  const local = await benchmarkReactPdfEngine(resume, iterations)
+
+  if (!remoteEndpoint) {
+    return { local }
+  }
+
+  const remote = await benchmarkRemotePdfEngine(resume, remoteEndpoint, iterations)
+  return {
+    local,
+    remote,
+    deltaAvgMs: remote.avgMs - local.avgMs,
+    deltaP50Ms: remote.p50Ms - local.p50Ms,
   }
 }
 

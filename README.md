@@ -50,6 +50,10 @@ npm run dev      # Start dev server
 npm run lint     # Run ESLint
 npm run build    # Type-check + production build
 npm run preview  # Preview production build locally
+npm run test:unit # Run unit tests
+npm run test:e2e  # Run Playwright desktop/mobile interaction tests
+npm run test      # Run unit + e2e suite
+npm run bench:server # Run local Chromium benchmark server
 ```
 
 ## Routes

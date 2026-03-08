@@ -193,6 +193,31 @@ Run `public/sdk-playground.html` checks after builder QA:
 - Build: `npm run build` passed.
 - Lint: `npm run lint` passed.
 
-### Remaining for Pass 2 (Manual UX)
+## Pass 2 Findings (Interaction QA via Playwright)
 
-- Run full browser interactions on desktop + mobile and convert evidence-based statuses into interaction-verified pass/fail.
+- Date: 2026-03-08
+- Scope: Automated desktop/mobile interaction validation (builder QoL flows)
+- Command: `npm run test:e2e`
+- Result: Passed (`2 passed`, project-scoped counterparts skipped by design)
+
+Covered scenarios:
+
+1. Desktop
+  - `Fix next` remains actionable.
+  - Tooltip appears with guidance text.
+  - Click navigates to active section state.
+  - Preview header page indicator is visible.
+
+2. Mobile
+  - `Edit` / `Preview` switching works.
+  - Mobile bottom action `Export` opens the export menu.
+
+Support checks:
+
+- Unit logic tests: `npm run test:unit` (next-action resolver) -> passed.
+- Quality gates: `npm run lint` and `npm run build` -> passed.
+
+### QA Status
+
+- Pass 1 (code/runtime): complete
+- Pass 2 (interaction): complete

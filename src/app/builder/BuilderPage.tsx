@@ -19,6 +19,7 @@ import {
 } from '../../components/ui/Icons'
 import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
 import { loadDraft, saveDraft } from '../../lib/storage'
+import { resolveNextActionSection } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
 import { createEmptyResume, type Resume } from '../../types/resume'
 
@@ -182,6 +183,7 @@ function downloadJson(resume: Resume): void {
 }
 
 const DRAFT_SAVE_DEBOUNCE_MS = 900
+const REMOTE_PDF_BENCHMARK_ENDPOINT = (import.meta.env.VITE_PDF_BENCHMARK_ENDPOINT as string | undefined)?.trim()
 
 export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -474,7 +476,7 @@ export function BuilderPage() {
   }, [resume])
 
   const nextActionSection = useMemo(() => {
-    return completion.firstMissingEssentialSection ?? nextIssueSection
+    return resolveNextActionSection(completion.firstMissingEssentialSection, nextIssueSection)
   }, [completion.firstMissingEssentialSection, nextIssueSection])
 
   const fixNextTooltipText = useMemo(() => {
@@ -593,14 +595,23 @@ export function BuilderPage() {
     if (benchmarkBusy) return
     try {
       setBenchmarkBusy(true)
-      const { benchmarkReactPdfEngine } = await import('../../pdf/pdfRenderer')
-      const stats = await benchmarkReactPdfEngine(resume, 4)
-      const summary = `PDF bench p50 ${stats.p50Ms}ms • avg ${stats.avgMs}ms • ${Math.round(stats.avgHeadingCoveragePct)}% headings`
+      const { comparePdfEngines } = await import('../../pdf/pdfRenderer')
+      const comparison = await comparePdfEngines(
+        resume,
+        REMOTE_PDF_BENCHMARK_ENDPOINT || undefined,
+        4,
+      )
+
+      const local = comparison.local
+      const remote = comparison.remote
+      const summary = remote
+        ? `PDF bench local ${local.avgMs}ms vs ${remote.engine} ${remote.avgMs}ms (d${comparison.deltaAvgMs ?? 0}ms)`
+        : `PDF bench p50 ${local.p50Ms}ms • avg ${local.avgMs}ms • ${Math.round(local.avgHeadingCoveragePct)}% headings`
       setBenchmarkSummary(summary)
       setCopyState(summary)
       setTimeout(() => setCopyState(''), 1800)
       if (import.meta.env.DEV) {
-        console.info('[cv-embed] pdf benchmark', stats)
+        console.info('[cv-embed] pdf benchmark', comparison)
       }
     } finally {
       setBenchmarkBusy(false)
