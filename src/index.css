@@ -524,8 +524,8 @@ button {
 
 .completion-strip {
   display: grid;
-  gap: 5px;
-  padding: 7px 8px;
+  gap: 6px;
+  padding: 8px 9px;
   background: var(--surface);
   border: 1px solid var(--border-dim);
   border-radius: var(--r-lg);
@@ -534,13 +534,39 @@ button {
 
 .completion-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
+}
+
+.completion-title-group {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.completion-title {
   font-family: 'Azeret Mono', monospace;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-2);
+}
+
+.completion-subtitle {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  color: var(--text-3);
+}
+
+.completion-value {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  white-space: nowrap;
 }
 
 .completion-track {
@@ -595,7 +621,7 @@ button {
   font-family: 'Azeret Mono', monospace;
   font-size: 9px;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--surface-3);
   color: var(--text-2);
@@ -1484,6 +1510,14 @@ h4.skill-cat-title { margin: 0 0 6px; }
 
   .completion-actions {
     flex-wrap: wrap;
+  }
+
+  .completion-head {
+    align-items: center;
+  }
+
+  .completion-subtitle {
+    font-size: 8px;
   }
 
   .completion-actions .jump-issue-btn {

@@ -500,20 +500,20 @@ export function BuilderPage() {
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
 
-        <div className="completion-strip" title="Progress based on visible sections and shared essentials criteria">
+        <div className="completion-strip" title="Readiness based on section coverage, essentials, and validation state">
           <div className="completion-head">
-            <span>Visible Blocks</span>
-            <span>{completion.percent}%</span>
+            <div className="completion-title-group">
+              <span className="completion-title">Resume Readiness</span>
+              <span className="completion-subtitle">{completion.done}/{completion.total} sections complete</span>
+            </div>
+            <span className="completion-value">{completion.percent}%</span>
           </div>
           <div className="completion-track" aria-hidden>
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
           </div>
           <div className="completion-foot">
-            <span className="completion-pill">
-              <IconCheck size={10} /> {completion.done}/{completion.total} visible
-            </span>
             <span className={`completion-pill ${completion.firstMissingEssentialSection ? 'warn' : 'ok'}`}>
-              <IconAlertTriangle size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
+              <IconCheck size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
             </span>
           </div>
           <div className="completion-actions">
