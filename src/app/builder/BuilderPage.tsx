@@ -481,9 +481,9 @@ export function BuilderPage() {
 
   const fixNextTooltipText = useMemo(() => {
     if (nextActionSection) {
-      return `Next action: complete ${SECTION_LABELS[nextActionSection]} first. Click this pill to jump.`
+      return `Next action: complete ${SECTION_LABELS[nextActionSection]} first.`
     }
-    return 'Next action: fix listed validation issues. Click this pill to jump.'
+    return 'Next action: fix listed validation issues.'
   }, [nextActionSection])
 
   useEffect(() => {
@@ -730,46 +730,37 @@ export function BuilderPage() {
                 </span>
               </div>
             </div>
-            <span className="completion-value">{completion.percent}%</span>
+            <div className="completion-head-right">
+              {issueSummary.total > 0 ? (
+                <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
+                  <button
+                    type="button"
+                    className={`completion-pill completion-pill-action completion-pill-compact ${issueSummary.severity === 'errors' ? 'error' : 'warn'}`}
+                    title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
+                    aria-label="Fix next issue"
+                    onClick={jumpToFirstIssue}
+                  >
+                    <IconAlertTriangle size={10} /> {issueSummary.label}
+                  </button>
+                  <div className="completion-pill-popover" role="tooltip">
+                    {fixNextTooltipText}
+                  </div>
+                </div>
+              ) : (
+                <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
+                  <span className="completion-pill completion-pill-compact ok">
+                    <IconCheck size={10} /> Clean
+                  </span>
+                  <div className="completion-pill-popover" role="tooltip">
+                    No validation issues right now. Next action: add measurable outcomes to improve overall quality.
+                  </div>
+                </div>
+              )}
+              <span className="completion-value">{completion.percent}%</span>
+            </div>
           </div>
           <div className="completion-track" aria-hidden>
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
-          </div>
-          <div className="completion-pills">
-            <div className="completion-pill-wrap" tabIndex={0} aria-label="Essentials guidance">
-              <span className={`completion-pill ${completion.firstMissingEssentialSection ? 'warn' : 'ok'}`}>
-                <IconCheck size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
-              </span>
-              <div className="completion-pill-popover" role="tooltip">
-                {completion.firstMissingEssentialSection
-                  ? `Next action: complete ${SECTION_LABELS[completion.firstMissingEssentialSection]}.`
-                  : 'Essentials complete. Next action: tighten bullets and links for stronger scoring.'}
-              </div>
-            </div>
-            {issueSummary.total > 0 ? (
-              <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
-              <button
-                type="button"
-                className={`completion-pill completion-pill-action ${issueSummary.severity === 'errors' ? 'error' : 'warn'}`}
-                title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
-                onClick={jumpToFirstIssue}
-              >
-                <IconAlertTriangle size={10} /> {issueSummary.label} · Fix next
-              </button>
-                <div className="completion-pill-popover" role="tooltip">
-                  {fixNextTooltipText}
-                </div>
-              </div>
-            ) : (
-              <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
-                <span className="completion-pill ok">
-                  <IconCheck size={10} /> Issues clean
-                </span>
-                <div className="completion-pill-popover" role="tooltip">
-                  No validation issues right now. Next action: add measurable outcomes to improve overall quality.
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
