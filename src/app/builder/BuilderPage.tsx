@@ -516,6 +516,21 @@ export function BuilderPage() {
               <IconAlertTriangle size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
             </span>
           </div>
+          <div className="completion-actions">
+            <span className={`issues-pill ${issueSummary.severity}`} title={issueSummary.title}>
+              {issueSummary.label}
+            </span>
+            {(validation.errors.length > 0 || validation.warnings.length > 0) ? (
+              <button
+                type="button"
+                className="tool-btn jump-issue-btn"
+                title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
+                onClick={jumpToFirstIssue}
+              >
+                <IconAlertTriangle size={12} /> Fix next
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {embedArtifacts ? (
@@ -678,20 +693,6 @@ export function BuilderPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="toolbar-sep" />
-              {(validation.errors.length > 0 || validation.warnings.length > 0) ? (
-                <button
-                  type="button"
-                  className="tool-btn jump-issue-btn"
-                  title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
-                  onClick={jumpToFirstIssue}
-                >
-                  <IconAlertTriangle size={12} /> Fix next
-                </button>
-              ) : null}
-              <span className={`issues-pill ${issueSummary.severity}`} title={issueSummary.title}>
-                {issueSummary.label}
-              </span>
               <div className="score-hover-wrap" tabIndex={0} aria-label="Scoring rubric">
                 <span className="score-pill" title="Validation score out of 100">Score: {validation.score}/100</span>
                 <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
