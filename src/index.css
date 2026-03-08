@@ -154,6 +154,38 @@ button {
 
 .single-pane { max-width: 860px; }
 
+.embed-host .panel {
+  border-radius: var(--embed-radius, var(--r-lg));
+}
+
+.embed-host .resume-template {
+  font-size: calc(1em * var(--embed-font-scale, 1));
+}
+
+.embed-guidance,
+.embed-debug {
+  display: grid;
+  gap: 4px;
+  padding: 9px 11px;
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.embed-guidance strong,
+.embed-debug strong {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+.embed-guidance p,
+.embed-debug p {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
 /* ═══════════════════════ Panel ═══════════════════════ */
 
 .panel {

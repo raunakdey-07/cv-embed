@@ -62,10 +62,29 @@ function buildEmbedArtifacts(baseUrl: string, resume: Resume, options: EmbedBuil
     portable.searchParams.set('showDownload', '0')
   }
   const portableUrl = portable.toString()
+  const sdkUrl = `${origin}/sdk.js?v=2`
   const iframeSnippet = `<iframe src="${portableUrl}" width="100%" height="${options.iframeHeight}" frameborder="0" loading="lazy" title="Resume"></iframe>`
-  const sdkSnippet = `<script src="${origin}/sdk.js"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${JSON.stringify(resume, null, 2)},\n    height: ${options.iframeHeight},\n    options: { showDownload: ${options.showDownload ? 'true' : 'false'} }\n  });\n</script>`
+  const sdkSnippet = `<script src="${sdkUrl}"></script>\n<div id="resume-container"></div>\n<script>\n  const embed = CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${JSON.stringify(resume, null, 2)},\n    height: ${options.iframeHeight},\n    theme: { density: 'compact', fontScale: 1, radius: 8 },\n    options: {\n      showDownload: ${options.showDownload ? 'true' : 'false'},\n      autoHeight: true,\n      mode: 'guided',\n      eventTargetOrigin: window.location.origin\n    },\n    events: {\n      onReady: (payload) => console.log('cv-embed ready', payload),\n      onValidationChange: (payload) => console.log('cv-embed validation', payload),\n      onHeightChange: ({ height }) => console.log('cv-embed height', height)\n    }\n  });\n</script>`
   const reactSnippet = `<iframe src="${portableUrl}" style={{ width: '100%', height: '${options.iframeHeight}px', border: 0 }} loading="lazy" title="Resume" />`
-  return { portableUrl, iframeSnippet, sdkSnippet, reactSnippet }
+  const integrationPack = [
+    'CV-Embed Integration Pack v2',
+    '',
+    `Embed URL:\n${portableUrl}`,
+    '',
+    `iframe:\n${iframeSnippet}`,
+    '',
+    `React iframe:\n${reactSnippet}`,
+    '',
+    `SDK:\n${sdkSnippet}`,
+    '',
+    'Event API emitted by iframe:',
+    '- ready',
+    '- heightChange',
+    '- validationChange',
+    '- sectionFocus',
+    '- export',
+  ].join('\n')
+  return { portableUrl, iframeSnippet, sdkSnippet, reactSnippet, integrationPack }
 }
 
 type SectionId =
@@ -121,6 +140,7 @@ interface EmbedArtifacts {
   iframeSnippet: string
   sdkSnippet: string
   reactSnippet: string
+  integrationPack: string
 }
 
 interface EmbedBuildOptions {
@@ -632,6 +652,7 @@ export function BuilderPage() {
             <div className="embed-row"><span className="embed-label">iframe</span><button type="button" className="tool-btn" onClick={() => copyTo('iframe', embedArtifacts.iframeSnippet)}><IconCopy size={11} /></button></div>
             <div className="embed-row"><span className="embed-label">react</span><button type="button" className="tool-btn" onClick={() => copyTo('React iframe', embedArtifacts.reactSnippet)}><IconCopy size={11} /></button></div>
             <div className="embed-row"><span className="embed-label">sdk</span><button type="button" className="tool-btn" onClick={() => copyTo('SDK snippet', embedArtifacts.sdkSnippet)}><IconCopy size={11} /></button></div>
+            <div className="embed-row"><span className="embed-label">pack</span><button type="button" className="tool-btn" onClick={() => copyTo('Integration pack', embedArtifacts.integrationPack)}><IconCopy size={11} /></button></div>
             {copyState ? <span className="copy-toast"><IconCheck size={11} /> {copyState}</span> : null}
           </div>
         ) : null}

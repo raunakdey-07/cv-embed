@@ -4,4 +4,4 @@ export const CVEmbed = {
   render: (config: CVEmbedConfig) => renderEmbed(config),
 }
 
-export type { CVEmbedConfig }
+export type { CVEmbedBridgeEvent, CVEmbedConfig, CVEmbedEvents, CVEmbedInstance } from './renderer'
