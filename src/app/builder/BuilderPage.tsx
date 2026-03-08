@@ -261,17 +261,12 @@ export function BuilderPage() {
 
   const completion = useMemo(() => {
     const hasText = (value: string) => value.trim().length > 0
-
-    const basicsChecks = [
-      hasText(resume.basics.name),
-      hasText(resume.basics.email),
-      hasText(resume.basics.phone),
-      hasText(resume.basics.location),
-      resume.basics.links.some((item) => hasText(item.url)),
-    ]
-
-    const essentialsDone = basicsChecks.filter(Boolean).length
-    const essentialsTotal = basicsChecks.length
+    const uniqueSkillCount = new Set([
+      ...resume.skills.languages,
+      ...resume.skills.frameworks,
+      ...resume.skills.tools,
+      ...resume.skills.other,
+    ].map((value) => value.trim().toLowerCase()).filter(Boolean)).size
 
     const sectionCompletion = {
       summary: hasText(resume.basics.summary),
@@ -291,12 +286,24 @@ export function BuilderPage() {
       publications: resume.publications.some((item) => [item.title, item.venue, item.date, item.url].some(hasText)),
     }
 
+    const basicsCoreReady = hasText(resume.basics.name) && hasText(resume.basics.email) && hasText(resume.basics.phone)
+    const essentialsChecks = [
+      basicsCoreReady,
+      sectionCompletion.education,
+      sectionCompletion.experience || sectionCompletion.projects,
+      uniqueSkillCount >= 3,
+      sectionCompletion.accomplishments,
+    ]
+
     const visibleSections = Object.entries(resume.meta.documentOptions.showSections)
       .filter(([, visible]) => visible)
       .map(([section]) => section as keyof typeof sectionCompletion)
 
     const blocksTotal = 1 + visibleSections.length
-    const blocksDone = (essentialsDone > 0 ? 1 : 0) + visibleSections.filter((section) => sectionCompletion[section]).length
+    const blocksDone = (basicsCoreReady ? 1 : 0) + visibleSections.filter((section) => sectionCompletion[section]).length
+
+    const essentialsDone = essentialsChecks.filter(Boolean).length
+    const essentialsTotal = essentialsChecks.length
 
     return {
       done: blocksDone,
@@ -484,7 +491,7 @@ export function BuilderPage() {
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
 
-        <div className="completion-strip" title="Live section completion based on core resume blocks">
+        <div className="completion-strip" title="Progress based on visible sections and shared essentials criteria">
           <div className="completion-head">
             <span>Visible Blocks</span>
             <span>{completion.percent}%</span>
@@ -493,7 +500,8 @@ export function BuilderPage() {
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
           </div>
           <div className="completion-meta">{completion.done}/{completion.total} visible blocks complete</div>
-          <div className="completion-meta">Essentials: {completion.essentialsDone}/{completion.essentialsTotal} ({completion.essentialsPercent}%)</div>
+          <div className="completion-meta">Essentials: Basics core + Education + Experience/Projects + Skills (3+) + Accomplishments</div>
+          <div className="completion-meta">Essentials done: {completion.essentialsDone}/{completion.essentialsTotal} ({completion.essentialsPercent}%)</div>
         </div>
 
         {embedArtifacts ? (
@@ -684,8 +692,8 @@ export function BuilderPage() {
                   <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
                     <p className="score-help-title">Scoring Rubric</p>
                     <ul>
-                      <li><strong>Projects:</strong> at least 1 required</li>
-                      <li><strong>Skills:</strong> 3+ distinct required</li>
+                      <li><strong>Essentials:</strong> Basics core, Education, Experience/Projects, Skills (3+), Accomplishments</li>
+                      <li><strong>Projects:</strong> still strongly preferred for profile depth</li>
                       <li><strong>Errors:</strong> high score penalty</li>
                       <li><strong>Warnings:</strong> moderate penalty</li>
                       <li><strong>Bonuses:</strong> summary, links, depth</li>
