@@ -295,6 +295,14 @@ export function BuilderPage() {
       sectionCompletion.accomplishments,
     ]
 
+    const firstMissingEssentialSection: SectionId | null =
+      !basicsCoreReady ? 'basics'
+        : !sectionCompletion.education ? 'education'
+          : !(sectionCompletion.experience || sectionCompletion.projects) ? (resume.meta.documentOptions.showSections.experience ? 'experience' : 'projects')
+            : uniqueSkillCount < 3 ? 'skills'
+              : !sectionCompletion.accomplishments ? 'accomplishments'
+                : null
+
     const visibleSections = Object.entries(resume.meta.documentOptions.showSections)
       .filter(([, visible]) => visible)
       .map(([section]) => section as keyof typeof sectionCompletion)
@@ -312,6 +320,7 @@ export function BuilderPage() {
       essentialsDone,
       essentialsTotal,
       essentialsPercent: Math.round((essentialsDone / essentialsTotal) * 100),
+      firstMissingEssentialSection,
     }
   }, [resume])
 
@@ -408,10 +417,13 @@ export function BuilderPage() {
     `section-shell ${activeSection === id ? 'is-active' : 'is-compact'}`
 
   const jumpToFirstIssue = useCallback(() => {
-    const issue = validation.errors[0] ?? validation.warnings[0]
-    if (!issue) return
+    const section = completion.firstMissingEssentialSection
+      ?? (() => {
+        const issue = validation.errors[0] ?? validation.warnings[0]
+        return issue ? getSectionFromIssue(issue) : null
+      })()
+    if (!section) return
 
-    const section = getSectionFromIssue(issue)
     if (isMobileLayout) {
       setMobileView('edit')
     }
@@ -420,7 +432,7 @@ export function BuilderPage() {
     requestAnimationFrame(() => {
       document.getElementById(`section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
-  }, [isMobileLayout, validation.errors, validation.warnings])
+  }, [completion.firstMissingEssentialSection, isMobileLayout, validation.errors, validation.warnings])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -499,9 +511,14 @@ export function BuilderPage() {
           <div className="completion-track" aria-hidden>
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
           </div>
-          <div className="completion-meta">{completion.done}/{completion.total} visible blocks complete</div>
-          <div className="completion-meta">Essentials: Basics core + Education + Experience/Projects + Skills (3+) + Accomplishments</div>
-          <div className="completion-meta">Essentials done: {completion.essentialsDone}/{completion.essentialsTotal} ({completion.essentialsPercent}%)</div>
+          <div className="completion-foot">
+            <span className="completion-pill">
+              <IconCheck size={10} /> {completion.done}/{completion.total} visible
+            </span>
+            <span className={`completion-pill ${completion.firstMissingEssentialSection ? 'warn' : 'ok'}`}>
+              <IconAlertTriangle size={10} /> Essentials {completion.essentialsDone}/{completion.essentialsTotal}
+            </span>
+          </div>
         </div>
 
         {embedArtifacts ? (
@@ -669,10 +686,10 @@ export function BuilderPage() {
                 <button
                   type="button"
                   className="tool-btn jump-issue-btn"
-                  title="Jump to first issue (Ctrl/Cmd+Shift+J)"
+                  title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
                   onClick={jumpToFirstIssue}
                 >
-                  <IconAlertTriangle size={12} /> Fix first
+                  <IconAlertTriangle size={12} /> Fix next
                 </button>
               ) : null}
               <span className={`issues-pill ${issueSummary.severity}`} title={issueSummary.title}>

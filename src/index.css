@@ -576,6 +576,38 @@ button {
   color: var(--text-3);
 }
 
+.completion-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.completion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+
+.completion-pill.ok {
+  color: var(--green);
+  background: var(--green-dim);
+  border-color: rgba(54, 211, 153, 0.28);
+}
+
+.completion-pill.warn {
+  color: var(--orange);
+  background: var(--orange-dim);
+  border-color: rgba(245, 166, 35, 0.3);
+}
+
 .link-button {
   display: inline-flex;
   align-items: center;
