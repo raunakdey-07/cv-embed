@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { AccomplishmentsSection } from '../../components/sections/Accomplishments'
 import { ActivitiesSection } from '../../components/sections/Activities'
 import { BasicsSection } from '../../components/sections/Basics'
@@ -89,6 +89,18 @@ interface EmbedArtifacts {
   sdkSnippet: string
 }
 
+function formatRelativeTime(from: number, to: number): string {
+  const seconds = Math.max(0, Math.floor((to - from) / 1000))
+  if (seconds < 5) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 function downloadJson(resume: Resume): void {
   const blob = new Blob([JSON.stringify(resume, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -116,10 +128,25 @@ export function BuilderPage() {
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
   const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
+  const [saveState, setSaveState] = useState<'saving' | 'saved'>('saved')
+  const [savedAt, setSavedAt] = useState<number>(() => Date.now())
+  const [relativeNow, setRelativeNow] = useState<number>(() => Date.now())
 
   useEffect(() => {
-    saveDraft({ ...resume, meta: { ...resume.meta, updatedAt: new Date().toISOString() } })
+    setSaveState('saving')
+    const timer = window.setTimeout(() => {
+      saveDraft({ ...resume, meta: { ...resume.meta, updatedAt: new Date().toISOString() } })
+      setSavedAt(Date.now())
+      setSaveState('saved')
+    }, 220)
+
+    return () => window.clearTimeout(timer)
   }, [resume])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setRelativeNow(Date.now()), 15000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -171,6 +198,39 @@ export function BuilderPage() {
 
   const validation = useMemo(() => validateResume(resume), [resume])
 
+  const completion = useMemo(() => {
+    const hasText = (value: string) => value.trim().length > 0
+    const skills = [
+      ...resume.skills.languages,
+      ...resume.skills.frameworks,
+      ...resume.skills.tools,
+      ...resume.skills.other,
+    ]
+    const uniqueSkillCount = new Set(skills.map((value) => value.trim().toLowerCase()).filter(Boolean)).size
+
+    const checks = [
+      hasText(resume.basics.name) && hasText(resume.basics.email) && hasText(resume.basics.phone),
+      hasText(resume.basics.summary),
+      resume.education.some((item) => [item.institution, item.degree, item.field].some(hasText)),
+      resume.experience.some((item) => [item.company, item.role].some(hasText) || item.bullets.some(hasText)),
+      resume.projects.some((item) => [item.title, item.projectLink, item.repoLink].some(hasText) || item.bullets.some(hasText)),
+      uniqueSkillCount >= 3,
+      resume.basics.links.some((item) => hasText(item.url)),
+    ]
+
+    const done = checks.filter(Boolean).length
+    const total = checks.length
+    return {
+      done,
+      total,
+      percent: Math.round((done / total) * 100),
+    }
+  }, [resume])
+
+  const saveStatusText = saveState === 'saving'
+    ? 'Saving draft...'
+    : `Saved ${formatRelativeTime(savedAt, relativeNow)}`
+
   const onImportJson = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -180,21 +240,21 @@ export function BuilderPage() {
     } catch { alert('Invalid JSON') }
   }
 
-  const createEmbedLink = () => {
+  const createEmbedLink = useCallback(() => {
     if (embedArtifacts) {
       setEmbedArtifacts(null)
       return
     }
 
     setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume))
-  }
+  }, [embedArtifacts, embedBaseUrl, resume])
 
-  const onToggleMobileView = () => {
+  const onToggleMobileView = useCallback(() => {
     setMobileView((view) => (view === 'edit' ? 'preview' : 'edit'))
     setMobileExportOpen(false)
-  }
+  }, [])
 
-  const onDownloadPdf = async () => {
+  const onDownloadPdf = useCallback(async () => {
     try {
       setBusy(true)
       const { downloadResumePdf } = await import('../../pdf/pdfRenderer')
@@ -204,9 +264,9 @@ export function BuilderPage() {
     } finally {
       setBusy(false)
     }
-  }
+  }, [isMobileLayout, resume])
 
-  const onDownloadDocx = async () => {
+  const onDownloadDocx = useCallback(async () => {
     try {
       setBusy(true)
       const { downloadResumeDocx } = await import('../../docx/docxRenderer')
@@ -216,13 +276,13 @@ export function BuilderPage() {
     } finally {
       setBusy(false)
     }
-  }
+  }, [isMobileLayout, resume])
 
-  const onDownloadJson = () => {
+  const onDownloadJson = useCallback(() => {
     downloadJson(resume)
     if (isMobileLayout) setMobileView('preview')
     setMobileExportOpen(false)
-  }
+  }, [isMobileLayout, resume])
 
   const copyTo = async (label: string, value: string) => {
     await navigator.clipboard.writeText(value)
@@ -237,6 +297,37 @@ export function BuilderPage() {
 
   const sectionCls = (id: SectionId) =>
     `section-shell ${activeSection === id ? 'is-active' : 'is-compact'}`
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const withCommand = event.metaKey || event.ctrlKey
+      if (!withCommand) return
+
+      const key = event.key.toLowerCase()
+
+      if (key === 's' && !event.shiftKey) {
+        event.preventDefault()
+        if (!busy) {
+          void onDownloadPdf()
+        }
+        return
+      }
+
+      if (event.shiftKey && key === 'e') {
+        event.preventDefault()
+        createEmbedLink()
+        return
+      }
+
+      if (event.shiftKey && key === 'p' && isMobileLayout) {
+        event.preventDefault()
+        onToggleMobileView()
+      }
+    }
+
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [busy, createEmbedLink, isMobileLayout, onToggleMobileView, onDownloadPdf])
 
   const showEditPane = !isMobileLayout || mobileView === 'edit'
   const showPreviewPane = !isMobileLayout || mobileView === 'preview'
@@ -269,6 +360,17 @@ export function BuilderPage() {
       {showEditPane ? (
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
+
+        <div className="completion-strip" title="Live section completion based on core resume blocks">
+          <div className="completion-head">
+            <span>Completion</span>
+            <span>{completion.percent}%</span>
+          </div>
+          <div className="completion-track" aria-hidden>
+            <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
+          </div>
+          <div className="completion-meta">{completion.done}/{completion.total} core blocks complete</div>
+        </div>
 
         {embedArtifacts ? (
           <div className="embed-strip">
@@ -361,6 +463,9 @@ export function BuilderPage() {
             <IconEye size={16} />
             <span className="section-title">Preview</span>
             <span className="page-indicator" title="Estimated A4 pages in export">Pages: {estimatedPages}</span>
+            <span className={`save-indicator ${saveState === 'saving' ? 'saving' : 'saved'}`} title="Draft status">
+              {saveStatusText}
+            </span>
           </div>
           <div className="preview-head-actions">
             <div className="toolbar-strip toolbar-strip-right">
