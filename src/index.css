@@ -248,6 +248,34 @@ button {
 .status-dot.valid   { color: var(--green);  background: var(--green-dim); }
 .status-dot.invalid { color: var(--red);    background: var(--red-dim); }
 
+.issues-pill {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.issues-pill.clean {
+  color: var(--green);
+  background: var(--green-dim);
+  border-color: rgba(54, 211, 153, 0.3);
+}
+
+.issues-pill.warnings {
+  color: var(--orange);
+  background: var(--orange-dim);
+  border-color: rgba(245, 166, 35, 0.35);
+}
+
+.issues-pill.errors {
+  color: var(--red);
+  background: var(--red-dim);
+  border-color: rgba(239, 95, 95, 0.35);
+}
+
 .score-pill {
   font-family: 'Azeret Mono', monospace;
   font-size: 10px;
@@ -406,6 +434,19 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.embed-preset-select {
+  min-width: 148px;
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 4px 6px;
 }
 
 .embed-height-input {

@@ -15,7 +15,7 @@ import {
   IconAlertTriangle, IconAward, IconBraces, IconBriefcase, IconCheck,
   IconChevronDown, IconCode, IconCopy, IconDownload, IconExternalLink,
   IconEye, IconFileText, IconFlag, IconGraduationCap, IconLink,
-  IconSliders, IconTrophy, IconUpload, IconUser, IconXCircle, IconZap,
+  IconSliders, IconTrophy, IconUpload, IconUser, IconZap,
 } from '../../components/ui/Icons'
 import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
 import { loadDraft, saveDraft } from '../../lib/storage'
@@ -114,6 +114,18 @@ interface EmbedBuildOptions {
   showDownload: boolean
 }
 
+type EmbedPreset = 'placement' | 'portfolio' | 'showcase' | 'custom'
+
+function getEmbedPresetConfig(preset: Exclude<EmbedPreset, 'custom'>): EmbedBuildOptions {
+  if (preset === 'portfolio') {
+    return { iframeHeight: 1200, showDownload: true }
+  }
+  if (preset === 'showcase') {
+    return { iframeHeight: 900, showDownload: false }
+  }
+  return { iframeHeight: 1100, showDownload: false }
+}
+
 function formatRelativeTime(from: number, to: number): string {
   const seconds = Math.max(0, Math.floor((to - from) / 1000))
   if (seconds < 5) return 'just now'
@@ -151,6 +163,7 @@ export function BuilderPage() {
   const [scoreGuideOpen, setScoreGuideOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
+  const [embedPreset, setEmbedPreset] = useState<EmbedPreset>('placement')
   const [embedIframeHeight, setEmbedIframeHeight] = useState(1100)
   const [embedShowDownload, setEmbedShowDownload] = useState(false)
   const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
@@ -228,6 +241,24 @@ export function BuilderPage() {
 
   const validation = useMemo(() => validateResume(resume), [resume])
 
+  const issueSummary = useMemo(() => {
+    const errorCount = validation.errors.length
+    const warningCount = validation.warnings.length
+    const total = errorCount + warningCount
+    const severity: 'clean' | 'warnings' | 'errors' = errorCount > 0 ? 'errors' : warningCount > 0 ? 'warnings' : 'clean'
+    const label = total === 0 ? 'Clean' : `${errorCount}E / ${warningCount}W`
+    const details = [
+      ...validation.errors.slice(0, 2).map((value) => `Error: ${value}`),
+      ...validation.warnings.slice(0, 2).map((value) => `Warning: ${value}`),
+    ]
+    return {
+      total,
+      label,
+      severity,
+      title: details.length > 0 ? details.join('\n') : 'No validation issues',
+    }
+  }, [validation.errors, validation.warnings])
+
   const completion = useMemo(() => {
     const hasText = (value: string) => value.trim().length > 0
     const skills = [
@@ -281,6 +312,24 @@ export function BuilderPage() {
       showDownload: embedShowDownload,
     }))
   }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
+
+  const onEmbedPresetChange = (preset: EmbedPreset) => {
+    setEmbedPreset(preset)
+    if (preset === 'custom') return
+    const config = getEmbedPresetConfig(preset)
+    setEmbedIframeHeight(config.iframeHeight)
+    setEmbedShowDownload(config.showDownload)
+  }
+
+  const onEmbedHeightChange = (value: number) => {
+    setEmbedPreset('custom')
+    setEmbedIframeHeight(Math.max(600, Math.min(2400, value)))
+  }
+
+  const onEmbedDownloadChange = (checked: boolean) => {
+    setEmbedPreset('custom')
+    setEmbedShowDownload(checked)
+  }
 
   const onToggleMobileView = useCallback(() => {
     setMobileView((view) => (view === 'edit' ? 'preview' : 'edit'))
@@ -440,6 +489,19 @@ export function BuilderPage() {
             </div>
             <div className="embed-row embed-config-row">
               <label className="embed-config-item">
+                <span className="embed-label">Preset</span>
+                <select
+                  className="embed-preset-select"
+                  value={embedPreset}
+                  onChange={(event) => onEmbedPresetChange(event.target.value as EmbedPreset)}
+                >
+                  <option value="placement">Placement Portal</option>
+                  <option value="portfolio">Portfolio</option>
+                  <option value="showcase">Compact Showcase</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+              <label className="embed-config-item">
                 <span className="embed-label">Height</span>
                 <input
                   className="embed-height-input"
@@ -451,7 +513,7 @@ export function BuilderPage() {
                   onChange={(event) => {
                     const parsed = Number.parseInt(event.target.value, 10)
                     if (Number.isNaN(parsed)) return
-                    setEmbedIframeHeight(Math.max(600, Math.min(2400, parsed)))
+                    onEmbedHeightChange(parsed)
                   }}
                 />
               </label>
@@ -460,7 +522,7 @@ export function BuilderPage() {
                 <input
                   type="checkbox"
                   checked={embedShowDownload}
-                  onChange={(event) => setEmbedShowDownload(event.target.checked)}
+                  onChange={(event) => onEmbedDownloadChange(event.target.checked)}
                 />
                 <span className="embed-toggle-text">{embedShowDownload ? 'Shown' : 'Hidden'}</span>
               </label>
@@ -584,9 +646,9 @@ export function BuilderPage() {
                   <IconAlertTriangle size={12} /> Fix first
                 </button>
               ) : null}
-              <div className={`status-dot ${validation.valid ? 'valid' : 'invalid'}`} title={validation.valid ? 'Validation: no errors' : `Validation errors:\n${validation.errors.join('\n')}`}>
-                {validation.valid ? <IconCheck size={12} /> : <IconXCircle size={12} />}
-              </div>
+              <span className={`issues-pill ${issueSummary.severity}`} title={issueSummary.title}>
+                {issueSummary.label}
+              </span>
               <span className="score-pill" title="Validation score out of 100">Score: {validation.score}/100</span>
               <div className="score-help-wrap" ref={scoreGuideRef}>
                 <button
@@ -610,8 +672,6 @@ export function BuilderPage() {
                   </div>
                 ) : null}
               </div>
-              {validation.errors.length > 0 ? <span className="err-badge" title={`Errors:\n${validation.errors.join('\n')}`}><IconXCircle size={10} /> {validation.errors.length}</span> : null}
-              {validation.warnings.length > 0 ? <span className="warn-badge" title={`Warnings:\n${validation.warnings.join('\n')}`}><IconAlertTriangle size={10} /> {validation.warnings.length}</span> : null}
             </div>
           </div>
         </div>
