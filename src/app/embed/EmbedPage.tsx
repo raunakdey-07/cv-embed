@@ -157,6 +157,8 @@ export function EmbedPage() {
       readOnlySections,
       lockedTemplate: lockedTemplate ?? null,
       score: validation.score,
+      qualityScore: validation.qualityScore,
+      completenessScore: validation.completenessScore,
       template: resume.meta.template,
     })
   }, [lockedTemplate, mode, postBridgeEvent, readOnlySections, resume, resumeId, sdkVersion, showDownload, validation])
@@ -165,6 +167,8 @@ export function EmbedPage() {
     if (!validation) return
     postBridgeEvent('validationChange', {
       score: validation.score,
+      qualityScore: validation.qualityScore,
+      completenessScore: validation.completenessScore,
       valid: validation.valid,
       errorCount: validation.errors.length,
       warningCount: validation.warnings.length,

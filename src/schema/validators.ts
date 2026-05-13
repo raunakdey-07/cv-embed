@@ -42,6 +42,42 @@ function dedupeAndFindDuplicates(skills: string[]): string[] {
   return [...duplicates]
 }
 
+function calculateQualityScore(errors: string[], warnings: string[], resume: Resume): number {
+  const errorPenalty = Math.min(errors.length * 8, 64)
+  const warningPenalty = Math.min(warnings.length * 2, 20)
+  const qualityBonus =
+    (resume.basics.summary.trim() ? 2 : 0) +
+    (resume.basics.links.some((link) => !isBlank(link.url)) ? 1 : 0) +
+    (resume.projects.length >= 2 ? 2 : 0) +
+    (resume.experience.length >= 1 ? 1 : 0)
+
+  return clampScore(100 - errorPenalty - warningPenalty + qualityBonus)
+}
+
+function calculateCompletenessScore(resume: Resume): number {
+  const hasText = (value: string) => !isBlank(value)
+  const uniqueSkills = [...new Set([
+    ...resume.skills.languages,
+    ...resume.skills.frameworks,
+    ...resume.skills.tools,
+    ...resume.skills.other,
+  ].map((skill) => skill.trim().toLowerCase()).filter(Boolean))]
+
+  const checks = [
+    hasText(resume.basics.name),
+    hasText(resume.basics.email),
+    hasText(resume.basics.phone),
+    resume.education.length > 0,
+    resume.experience.length > 0 || resume.projects.length > 0,
+    uniqueSkills.length >= 3,
+    resume.accomplishments.length > 0,
+    hasText(resume.basics.summary),
+    resume.basics.links.some((link) => hasText(link.url)),
+  ]
+
+  return clampScore(Math.round((checks.filter(Boolean).length / checks.length) * 100))
+}
+
 export function validateResume(resume: Resume): ValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
@@ -194,24 +230,16 @@ export function validateResume(resume: Resume): ValidationResult {
     warnings.push('Add a few more skills to improve discoverability')
   }
 
-  const hasSummary = !isBlank(resume.basics.summary)
-  const hasAnyLink = resume.basics.links.some((link) => !isBlank(link.url))
-
-  const errorPenalty = Math.min(errors.length * 10, 70)
-  const warningPenalty = Math.min(warnings.length * 3, 24)
-  const completenessBonus =
-    (meaningfulProjects.length >= 2 ? 3 : 0) +
-    (meaningfulExperience.length >= 1 ? 2 : 0) +
-    (hasSummary ? 2 : 0) +
-    (uniqueSkills.length >= 6 ? 2 : 0) +
-    (hasAnyLink ? 1 : 0)
-
-  const score = 100 - errorPenalty - warningPenalty + completenessBonus
+  const qualityScore = calculateQualityScore(errors, warnings, resume)
+  const completenessScore = calculateCompletenessScore(resume)
+  const score = clampScore(Math.round((qualityScore + completenessScore) / 2))
 
   return {
     valid: errors.length === 0,
     warnings,
     errors,
-    score: clampScore(score),
+    qualityScore,
+    completenessScore,
+    score,
   }
 }

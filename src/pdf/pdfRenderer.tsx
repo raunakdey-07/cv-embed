@@ -471,26 +471,6 @@ export async function benchmarkRemotePdfEngine(
   }
 }
 
-export async function comparePdfEngines(
-  resume: Resume,
-  remoteEndpoint?: string,
-  iterations = 3,
-): Promise<PdfEngineComparison> {
-  const local = await benchmarkReactPdfEngine(resume, iterations)
-
-  if (!remoteEndpoint) {
-    return { local }
-  }
-
-  const remote = await benchmarkRemotePdfEngine(resume, remoteEndpoint, iterations)
-  return {
-    local,
-    remote,
-    deltaAvgMs: remote.avgMs - local.avgMs,
-    deltaP50Ms: remote.p50Ms - local.p50Ms,
-  }
-}
-
 export async function countPdfPages(resume: Resume): Promise<number> {
   const blob = await renderResumePdfBlob(resume)
   const text = await blob.text()

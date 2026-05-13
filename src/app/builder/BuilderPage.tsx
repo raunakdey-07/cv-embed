@@ -136,6 +136,45 @@ function getSectionFromIssue(issue: string): SectionId {
   return 'basics'
 }
 
+function hasText(value: string): boolean {
+  return value.trim().length > 0
+}
+
+function isBlankResume(resume: Resume): boolean {
+  const basics = [
+    resume.basics.name,
+    resume.basics.headline,
+    resume.basics.email,
+    resume.basics.phone,
+    resume.basics.location,
+    resume.basics.summary,
+    ...resume.basics.links.flatMap((link) => [link.label, link.url]),
+  ]
+
+  const education = resume.education.flatMap((item) => [item.institution, item.degree, item.field, item.cgpa, item.startDate, item.endDate, item.location])
+  const experience = resume.experience.flatMap((item) => [item.company, item.role, item.location, item.startDate, item.endDate, ...item.bullets])
+  const projects = resume.projects.flatMap((item) => [item.title, item.projectLink, item.repoLink, item.startDate, item.endDate, ...item.techStack, ...item.bullets])
+  const skills = [...resume.skills.languages, ...resume.skills.frameworks, ...resume.skills.tools, ...resume.skills.other]
+  const certifications = resume.certifications.flatMap((item) => [item.title, item.issuer, item.date, item.credentialId, item.credentialUrl])
+  const accomplishments = resume.accomplishments.flatMap((item) => [item.title, item.organization, item.location, item.startDate, item.endDate, ...item.bullets])
+  const activities = resume.activities.flatMap((item) => [item.role, item.organization, item.location, item.startDate, item.endDate, item.referenceUrl])
+  const volunteering = resume.volunteering.flatMap((item) => [item.role, item.organization, item.location, item.startDate, item.endDate, ...item.bullets])
+  const publications = resume.publications.flatMap((item) => [item.title, item.venue, item.date, item.url])
+
+  return [
+    ...basics,
+    ...education,
+    ...experience,
+    ...projects,
+    ...skills,
+    ...certifications,
+    ...accomplishments,
+    ...activities,
+    ...volunteering,
+    ...publications,
+  ].every((value) => !hasText(value))
+}
+
 interface EmbedArtifacts {
   portableUrl: string
   iframeSnippet: string
@@ -183,12 +222,10 @@ function downloadJson(resume: Resume): void {
 }
 
 const DRAFT_SAVE_DEBOUNCE_MS = 900
-const REMOTE_PDF_BENCHMARK_ENDPOINT = (import.meta.env.VITE_PDF_BENCHMARK_ENDPOINT as string | undefined)?.trim()
 
 export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const exportRef = useRef<HTMLDivElement>(null)
-  const mobileActionsRef = useRef<HTMLDivElement>(null)
   const pageCountCacheRef = useRef<Map<string, number>>(new Map())
   const pageCountJobRef = useRef(0)
   const pageCountDelayTimerRef = useRef<number | null>(null)
@@ -200,12 +237,11 @@ export function BuilderPage() {
   const [copyState, setCopyState] = useState('')
   const [activeSection, setActiveSection] = useState<SectionId>('basics')
   const [exportOpen, setExportOpen] = useState(false)
-  const [mobileExportOpen, setMobileExportOpen] = useState(false)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [isPageEstimateStale, setIsPageEstimateStale] = useState(false)
   const [isPageEstimating, setIsPageEstimating] = useState(false)
   const [lastEstimateDurationMs, setLastEstimateDurationMs] = useState<number | null>(null)
-  const [lastEstimateSource, setLastEstimateSource] = useState<'cache' | 'idle' | 'urgent' | null>(null)
+  const [lastEstimateSource, setLastEstimateSource] = useState<'blank' | 'cache' | 'idle' | 'urgent' | null>(null)
   const [lastEstimateUpdatedAt, setLastEstimateUpdatedAt] = useState<number | null>(null)
   const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
   const [embedPreset, setEmbedPreset] = useState<EmbedPreset>('placement')
@@ -213,12 +249,9 @@ export function BuilderPage() {
   const [embedShowDownload, setEmbedShowDownload] = useState(false)
   const isEmbedPanelOpen = embedArtifacts !== null
   const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
-  const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
   const [saveState, setSaveState] = useState<'saving' | 'saved'>('saved')
   const [savedAt, setSavedAt] = useState<number>(() => Date.now())
   const [relativeNow, setRelativeNow] = useState<number>(() => Date.now())
-  const [benchmarkBusy, setBenchmarkBusy] = useState(false)
-  const [benchmarkSummary, setBenchmarkSummary] = useState('')
 
   useEffect(() => {
     setSaveState('saving')
@@ -239,7 +272,6 @@ export function BuilderPage() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
-      if (mobileActionsRef.current && !mobileActionsRef.current.contains(e.target as Node)) setMobileExportOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -253,10 +285,6 @@ export function BuilderPage() {
     const media = window.matchMedia('(max-width: 900px)')
     const onChange = (event: MediaQueryListEvent) => {
       setIsMobileLayout(event.matches)
-      if (!event.matches) {
-        setMobileView('edit')
-        setMobileExportOpen(false)
-      }
     }
 
     setIsMobileLayout(media.matches)
@@ -290,6 +318,17 @@ export function BuilderPage() {
 
   const schedulePageEstimate = useCallback((priority: 'idle' | 'urgent') => {
     clearScheduledPageCount()
+
+    if (isBlankResume(resume)) {
+      setEstimatedPages(1)
+      setLastEstimateDurationMs(0)
+      setLastEstimateSource('blank')
+      setLastEstimateUpdatedAt(Date.now())
+      setIsPageEstimateStale(false)
+      setIsPageEstimating(false)
+      return
+    }
+
     setIsPageEstimateStale(true)
     setIsPageEstimating(true)
 
@@ -380,10 +419,10 @@ export function BuilderPage() {
   }, [clearScheduledPageCount, schedulePageEstimate])
 
   useEffect(() => {
-    if (exportOpen || mobileExportOpen || isEmbedPanelOpen) {
+    if (exportOpen || isEmbedPanelOpen) {
       schedulePageEstimate('urgent')
     }
-  }, [exportOpen, isEmbedPanelOpen, mobileExportOpen, schedulePageEstimate])
+  }, [exportOpen, isEmbedPanelOpen, schedulePageEstimate])
 
   const validation = useMemo(() => validateResume(resume), [resume])
 
@@ -404,6 +443,8 @@ export function BuilderPage() {
       title: details.length > 0 ? details.join('\n') : 'No validation issues',
     }
   }, [validation.errors, validation.warnings])
+
+  const qualityScoreLabel = `Quality: ${validation.qualityScore}/100`
 
   const nextIssueSection = useMemo(() => {
     const issue = validation.errors[0] ?? validation.warnings[0]
@@ -502,12 +543,12 @@ export function BuilderPage() {
     : `Saved ${formatRelativeTime(savedAt, relativeNow)}`
 
   const pageIndicatorText = isPageEstimating && isPageEstimateStale
-    ? `Pages: ~${estimatedPages} (estimating...)`
+    ? `Est. pages: ${estimatedPages}`
     : `Pages: ${estimatedPages}`
 
   const pageIndicatorTitle = (() => {
     if (isPageEstimating) {
-      return 'Estimated A4 pages in export (estimating...)'
+      return 'Estimated A4 pages in export'
     }
 
     if (lastEstimateSource && typeof lastEstimateDurationMs === 'number' && lastEstimateUpdatedAt) {
@@ -556,67 +597,29 @@ export function BuilderPage() {
     setEmbedShowDownload(checked)
   }
 
-  const onToggleMobileView = useCallback(() => {
-    setMobileView((view) => (view === 'edit' ? 'preview' : 'edit'))
-    setMobileExportOpen(false)
-  }, [])
-
   const onDownloadPdf = useCallback(async () => {
     try {
       setBusy(true)
       const { downloadResumePdf } = await import('../../pdf/pdfRenderer')
       await downloadResumePdf(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.pdf`)
-      if (isMobileLayout) setMobileView('preview')
-      setMobileExportOpen(false)
     } finally {
       setBusy(false)
     }
-  }, [isMobileLayout, resume])
+  }, [resume])
 
   const onDownloadDocx = useCallback(async () => {
     try {
       setBusy(true)
       const { downloadResumeDocx } = await import('../../docx/docxRenderer')
       await downloadResumeDocx(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.docx`)
-      if (isMobileLayout) setMobileView('preview')
-      setMobileExportOpen(false)
     } finally {
       setBusy(false)
     }
-  }, [isMobileLayout, resume])
+  }, [resume])
 
   const onDownloadJson = useCallback(() => {
     downloadJson(resume)
-    if (isMobileLayout) setMobileView('preview')
-    setMobileExportOpen(false)
-  }, [isMobileLayout, resume])
-
-  const onRunPdfBenchmark = useCallback(async () => {
-    if (benchmarkBusy) return
-    try {
-      setBenchmarkBusy(true)
-      const { comparePdfEngines } = await import('../../pdf/pdfRenderer')
-      const comparison = await comparePdfEngines(
-        resume,
-        REMOTE_PDF_BENCHMARK_ENDPOINT || undefined,
-        4,
-      )
-
-      const local = comparison.local
-      const remote = comparison.remote
-      const summary = remote
-        ? `PDF bench local ${local.avgMs}ms vs ${remote.engine} ${remote.avgMs}ms (d${comparison.deltaAvgMs ?? 0}ms)`
-        : `PDF bench p50 ${local.p50Ms}ms • avg ${local.avgMs}ms • ${Math.round(local.avgHeadingCoveragePct)}% headings`
-      setBenchmarkSummary(summary)
-      setCopyState(summary)
-      setTimeout(() => setCopyState(''), 1800)
-      if (import.meta.env.DEV) {
-        console.info('[cv-embed] pdf benchmark', comparison)
-      }
-    } finally {
-      setBenchmarkBusy(false)
-    }
-  }, [benchmarkBusy, resume])
+  }, [resume])
 
   const copyTo = async (label: string, value: string) => {
     await navigator.clipboard.writeText(value)
@@ -624,27 +627,54 @@ export function BuilderPage() {
     setTimeout(() => setCopyState(''), 1800)
   }
 
+  const embedSnippetCards = embedArtifacts ? [
+    {
+      key: 'iframe',
+      label: 'iframe',
+      title: 'Portable iframe',
+      description: 'Drop-in embed for portals and static sites.',
+      value: embedArtifacts.iframeSnippet,
+    },
+    {
+      key: 'react',
+      label: 'react',
+      title: 'React iframe',
+      description: 'JSX-friendly embed for React applications.',
+      value: embedArtifacts.reactSnippet,
+    },
+    {
+      key: 'sdk',
+      label: 'sdk',
+      title: 'SDK bridge',
+      description: 'Script block with bridge events and callbacks.',
+      value: embedArtifacts.sdkSnippet,
+    },
+    {
+      key: 'pack',
+      label: 'pack',
+      title: 'Integration pack',
+      description: 'A single copy block with all host-facing artifacts.',
+      value: embedArtifacts.integrationPack,
+    },
+  ] : []
+
   const scrollTo = (id: SectionId) => {
     setActiveSection(id)
     document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
   const sectionCls = (id: SectionId) =>
-    `section-shell ${activeSection === id ? 'is-active' : 'is-compact'}`
+    `section-shell ${activeSection === id ? 'is-active' : ''}`
 
   const jumpToFirstIssue = useCallback(() => {
     const section = nextActionSection
     if (!section) return
 
-    if (isMobileLayout) {
-      setMobileView('edit')
-    }
-
     setActiveSection(section)
     requestAnimationFrame(() => {
       document.getElementById(`section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
-  }, [isMobileLayout, nextActionSection])
+  }, [nextActionSection])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -667,12 +697,6 @@ export function BuilderPage() {
         return
       }
 
-      if (event.shiftKey && key === 'p' && isMobileLayout) {
-        event.preventDefault()
-        onToggleMobileView()
-        return
-      }
-
       if (event.shiftKey && key === 'j') {
         event.preventDefault()
         jumpToFirstIssue()
@@ -681,36 +705,13 @@ export function BuilderPage() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [busy, createEmbedLink, isMobileLayout, jumpToFirstIssue, onToggleMobileView, onDownloadPdf])
+  }, [busy, createEmbedLink, jumpToFirstIssue, onDownloadPdf])
 
-  const showEditPane = !isMobileLayout || mobileView === 'edit'
-  const showPreviewPane = !isMobileLayout || mobileView === 'preview'
+  const showEditPane = true
+  const showPreviewPane = true
 
   return (
     <main className={`app-main two-pane ${isMobileLayout ? 'is-mobile-layout' : ''}`}>
-      {isMobileLayout ? (
-        <div className="mobile-view-switch" role="tablist" aria-label="Mobile view switch">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileView === 'edit'}
-            className={`mobile-view-tab ${mobileView === 'edit' ? 'active' : ''}`}
-            onClick={() => setMobileView('edit')}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileView === 'preview'}
-            className={`mobile-view-tab ${mobileView === 'preview' ? 'active' : ''}`}
-            onClick={() => setMobileView('preview')}
-          >
-            Preview
-          </button>
-        </div>
-      ) : null}
-
       {showEditPane ? (
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
@@ -766,8 +767,8 @@ export function BuilderPage() {
 
         {embedArtifacts ? (
           <div className="embed-strip">
-            <div className="embed-row">
-              <span className="embed-label">Public Base</span>
+            <div className="embed-field-row">
+              <span className="embed-label">Public Base URL</span>
               <input
                 className="embed-base-input"
                 value={embedBaseUrl}
@@ -776,8 +777,8 @@ export function BuilderPage() {
                 placeholder="https://cv-embed.vercel.app"
               />
             </div>
-            <div className="embed-row embed-config-row">
-              <label className="embed-config-item">
+            <div className="embed-config-row">
+              <label className="embed-config-item embed-config-pill">
                 <span className="embed-label">Preset</span>
                 <select
                   className="embed-preset-select"
@@ -790,7 +791,7 @@ export function BuilderPage() {
                   <option value="custom">Custom</option>
                 </select>
               </label>
-              <label className="embed-config-item">
+              <label className="embed-config-item embed-config-pill">
                 <span className="embed-label">Height</span>
                 <input
                   className="embed-height-input"
@@ -806,7 +807,7 @@ export function BuilderPage() {
                   }}
                 />
               </label>
-              <label className="embed-config-item embed-toggle-item">
+              <label className="embed-config-item embed-config-pill embed-toggle-item">
                 <span className="embed-label">Download</span>
                 <input
                   type="checkbox"
@@ -816,17 +817,40 @@ export function BuilderPage() {
                 <span className="embed-toggle-text">{embedShowDownload ? 'Shown' : 'Hidden'}</span>
               </label>
             </div>
-            <p className="embed-tip">Use `iframe` for no-code portals, `react` for JSX apps, and `sdk` for dynamic data rendering.</p>
-            <div className="embed-row">
-              <span className="embed-label">Embed URL</span>
+            <p className="embed-tip">Use iframe for portals, React for apps, and the SDK for host-controlled bridges.</p>
+            <div className="embed-link-card">
+              <div className="embed-link-card-head">
+                <span className="embed-label">Embed URL</span>
+                <div className="embed-link-actions">
+                  <a href={embedArtifacts.portableUrl} target="_blank" rel="noreferrer" className="embed-icon-btn" aria-label="Open embed URL">
+                    <IconExternalLink size={11} />
+                  </a>
+                  <button type="button" className="embed-icon-btn" onClick={() => copyTo('Embed URL', embedArtifacts.portableUrl)} aria-label="Copy embed URL">
+                    <IconCopy size={11} />
+                  </button>
+                </div>
+              </div>
               <span className="embed-url" title={embedArtifacts.portableUrl}>{embedArtifacts.portableUrl}</span>
-              <a href={embedArtifacts.portableUrl} target="_blank" rel="noreferrer"><IconExternalLink size={11} /></a>
-              <button type="button" className="tool-btn" onClick={() => copyTo('Embed URL', embedArtifacts.portableUrl)}><IconCopy size={11} /></button>
             </div>
-            <div className="embed-row"><span className="embed-label">iframe</span><button type="button" className="tool-btn" onClick={() => copyTo('iframe', embedArtifacts.iframeSnippet)}><IconCopy size={11} /></button></div>
-            <div className="embed-row"><span className="embed-label">react</span><button type="button" className="tool-btn" onClick={() => copyTo('React iframe', embedArtifacts.reactSnippet)}><IconCopy size={11} /></button></div>
-            <div className="embed-row"><span className="embed-label">sdk</span><button type="button" className="tool-btn" onClick={() => copyTo('SDK snippet', embedArtifacts.sdkSnippet)}><IconCopy size={11} /></button></div>
-            <div className="embed-row"><span className="embed-label">pack</span><button type="button" className="tool-btn" onClick={() => copyTo('Integration pack', embedArtifacts.integrationPack)}><IconCopy size={11} /></button></div>
+            <div className="embed-snippet-grid">
+              {embedSnippetCards.map((card) => (
+                <div className="embed-snippet-card" key={card.key}>
+                  <div className="embed-snippet-head">
+                    <div className="embed-snippet-title-group">
+                      <span className="embed-snippet-tag">{card.label}</span>
+                      <div>
+                        <p className="embed-snippet-title">{card.title}</p>
+                        <p className="embed-snippet-description">{card.description}</p>
+                      </div>
+                    </div>
+                    <button type="button" className="embed-icon-btn" onClick={() => copyTo(card.title, card.value)} aria-label={`Copy ${card.label} snippet`}>
+                      <IconCopy size={11} />
+                    </button>
+                  </div>
+                  <pre className="embed-snippet-code" title={card.value}>{card.value}</pre>
+                </div>
+              ))}
+            </div>
             {copyState ? <span className="copy-toast"><IconCheck size={11} /> {copyState}</span> : null}
           </div>
         ) : null}
@@ -917,17 +941,6 @@ export function BuilderPage() {
               >
                 <IconLink size={14} />
               </button>
-              {import.meta.env.DEV ? (
-                <button
-                  type="button"
-                  className="tool-btn"
-                  title={benchmarkSummary || 'Benchmark local PDF engine'}
-                  onClick={() => void onRunPdfBenchmark()}
-                  disabled={benchmarkBusy}
-                >
-                  <IconZap size={14} />
-                </button>
-              ) : null}
               <button type="button" className="tool-btn" title="Import resume JSON" onClick={() => fileRef.current?.click()}><IconUpload size={14} /></button>
               <div className="export-menu" ref={exportRef}>
                 <button type="button" className="tool-btn" title="Export resume" onClick={() => setExportOpen((o) => !o)} disabled={busy}>
@@ -942,15 +955,13 @@ export function BuilderPage() {
                 ) : null}
               </div>
               <div className="score-hover-wrap" tabIndex={0} aria-label="Scoring rubric">
-                <span className="score-pill" title="Validation score out of 100">Score: {validation.score}/100</span>
+                <span className="score-pill" title={qualityScoreLabel}>{qualityScoreLabel}</span>
                 <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
                   <p className="score-help-title">Scoring Rubric</p>
                   <ul>
-                    <li><strong>Essentials:</strong> Basics core, Education, Experience/Projects, Skills (3+), Accomplishments</li>
-                    <li><strong>Projects:</strong> still strongly preferred for profile depth</li>
-                    <li><strong>Errors:</strong> high score penalty</li>
-                    <li><strong>Warnings:</strong> moderate penalty</li>
-                    <li><strong>Bonuses:</strong> summary, links, depth</li>
+                    <li><strong>Quality:</strong> errors, warnings, and writing signals</li>
+                    <li><strong>Completeness:</strong> shown in the readiness strip above</li>
+                    <li><strong>Tip:</strong> use readiness to track section progress</li>
                   </ul>
                 </div>
               </div>
@@ -961,40 +972,6 @@ export function BuilderPage() {
           <TemplateRenderer resume={resume} />
         </div>
       </section>
-      ) : null}
-
-      {isMobileLayout ? (
-        <div className="mobile-bottom-actions-wrap" ref={mobileActionsRef}>
-          {mobileExportOpen ? (
-            <div className="mobile-export-sheet" role="menu" aria-label="Mobile export menu">
-              <button type="button" onClick={onDownloadPdf}><IconFileText size={14} /> PDF</button>
-              <button type="button" onClick={onDownloadDocx}><IconFileText size={14} /> DOCX</button>
-              <button type="button" onClick={onDownloadJson}><IconBraces size={14} /> JSON</button>
-            </div>
-          ) : null}
-
-          <div className="mobile-bottom-actions">
-            <button type="button" className="mobile-bottom-btn" onClick={onToggleMobileView}>
-              {mobileView === 'edit' ? <IconEye size={14} /> : <IconSliders size={14} />}
-              {mobileView === 'edit' ? 'Preview' : 'Edit'}
-            </button>
-            <button
-              type="button"
-              className={`mobile-bottom-btn ${mobileExportOpen ? 'active' : ''}`}
-              onClick={() => setMobileExportOpen((open) => !open)}
-              disabled={busy}
-            >
-              <IconDownload size={14} /> Export
-            </button>
-            <button
-              type="button"
-              className={`mobile-bottom-btn ${embedArtifacts ? 'active' : ''}`}
-              onClick={createEmbedLink}
-            >
-              <IconLink size={14} /> Embed
-            </button>
-          </div>
-        </div>
       ) : null}
     </main>
   )

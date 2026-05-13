@@ -165,6 +165,8 @@ export interface ValidationResult {
   valid: boolean
   warnings: string[]
   errors: string[]
+  qualityScore: number
+  completenessScore: number
   score: number
 }
 

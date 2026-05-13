@@ -21,21 +21,24 @@ test.describe('Builder QoL flows', () => {
     await expect(page.getByText(/Pages:/i)).toBeVisible()
   })
 
-  test('mobile: view switch and export menu are usable', async ({ page, isMobile }) => {
+  test('mobile: stacked layout and export menu are usable', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'mobile-only flow')
 
     await page.goto('/builder')
 
-    const previewTab = page.getByRole('tab', { name: 'Preview' })
-    await previewTab.click()
     await expect(page.locator('.preview-head-main .section-title').getByText('Preview')).toBeVisible()
-
-    const editButton = page.getByRole('button', { name: /Edit/i }).first()
-    await editButton.click()
     await expect(page.getByText('Resume Readiness')).toBeVisible()
 
-    const exportButton = page.locator('.mobile-bottom-actions').getByRole('button', { name: /Export/i })
-    await exportButton.click({ force: true })
-    await expect(page.getByRole('menu', { name: 'Mobile export menu' })).toBeVisible()
+    const leftPane = page.locator('.left-pane')
+    const rightPane = page.locator('.right-pane')
+    const [leftBox, rightBox] = await Promise.all([leftPane.boundingBox(), rightPane.boundingBox()])
+    expect(leftBox).not.toBeNull()
+    expect(rightBox).not.toBeNull()
+    expect(leftBox!.y).toBeLessThan(rightBox!.y)
+
+    const exportButton = page.locator('.preview-head .tool-btn[title="Export resume"]')
+    await expect(exportButton).toBeVisible()
+    await exportButton.click()
+    await expect(page.locator('.export-dropdown')).toBeVisible()
   })
 })

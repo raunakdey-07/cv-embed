@@ -58,7 +58,8 @@ npm run bench:server # Run local Chromium benchmark server
 
 ## Routes
 
-- `/builder` — Main resume builder
+- `/` — Main resume builder
+- `/builder` — Builder alias for shared links
 - `/embed/:resumeId` — Embedded resume view
 - `/embed/portable?data=...` — Encoded portable embed payload
 

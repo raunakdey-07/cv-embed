@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { BuilderPage } from './app/builder/BuilderPage'
 import { EmbedPage } from './app/embed/EmbedPage'
 
@@ -19,7 +19,7 @@ function App() {
         </header>
       ) : null}
       <Routes>
-        <Route path="/" element={<Navigate to="/builder" replace />} />
+        <Route path="/" element={<BuilderPage />} />
         <Route path="/builder" element={<BuilderPage />} />
         <Route path="/embed/:resumeId" element={<EmbedPage />} />
       </Routes>
