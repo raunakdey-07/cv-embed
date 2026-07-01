@@ -1572,6 +1572,63 @@ h4.skill-cat-title { margin: 0 0 6px; }
   .preview-head { flex-wrap: wrap; align-items: flex-start; }
   .preview-head-actions { width: 100%; justify-content: space-between; }
   .field-grid { grid-template-columns: 1fr; }
+
+  .completion-strip,
+  .embed-strip {
+    width: 100%;
+  }
+
+  .completion-head,
+  .completion-head-right,
+  .preview-head-main,
+  .preview-head-actions,
+  .toolbar-strip,
+  .toolbar-strip-right,
+  .embed-config-row,
+  .embed-link-card-head,
+  .embed-snippet-head,
+  .section-head,
+  .order-item,
+  .bullet-row,
+  .skill-input-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .completion-head-right,
+  .preview-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .completion-title-group,
+  .completion-title-row,
+  .completion-inline-tools,
+  .completion-info-wrap,
+  .completion-pill-wrap,
+  .score-hover-wrap,
+  .embed-config-item,
+  .embed-link-actions,
+  .embed-snippet-title-group {
+    min-width: 0;
+  }
+
+  .completion-value {
+    width: 100%;
+    text-align: left;
+  }
+
+  .score-hover-wrap,
+  .completion-pill-wrap,
+  .completion-info-wrap {
+    width: 100%;
+  }
+
+  .score-pill,
+  .completion-pill {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1722,6 +1779,14 @@ h4.skill-cat-title { margin: 0 0 6px; }
   }
 }
 
+@media (hover: none), (pointer: coarse) {
+  .score-help-popover,
+  .completion-pill-popover,
+  .completion-info-popover {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .brand-row h1 {
     font-size: 15px;
@@ -1741,6 +1806,24 @@ h4.skill-cat-title { margin: 0 0 6px; }
 
   .two-pane {
     gap: 8px;
+  }
+
+  .completion-head,
+  .preview-head,
+  .preview-head-main,
+  .preview-head-actions,
+  .toolbar-strip,
+  .toolbar-strip-right,
+  .completion-head-right,
+  .embed-config-row,
+  .embed-link-card-head,
+  .embed-snippet-head,
+  .embed-field-row,
+  .section-head,
+  .order-item,
+  .bullet-row,
+  .skill-input-row {
+    gap: 6px;
   }
 
   .preview-head-main {
@@ -1768,6 +1851,19 @@ h4.skill-cat-title { margin: 0 0 6px; }
     width: 100%;
     left: 0;
     right: auto;
+  }
+
+  .completion-head-right,
+  .preview-head-actions,
+  .toolbar-strip-right,
+  .embed-config-item {
+    width: 100%;
+  }
+
+  .score-pill,
+  .completion-pill {
+    min-height: 26px;
+    white-space: normal;
   }
 
   .resume-preview-canvas {
@@ -1801,16 +1897,6 @@ h4.skill-cat-title { margin: 0 0 6px; }
     box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
   }
 
-  .resume-template.template-compact .resume-compact-header,
-  .resume-template.template-compact .resume-compact-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .resume-template.template-compact .resume-compact-meta {
-    justify-items: start;
-    text-align: left;
-  }
-
   .resume-template .resume-row {
     flex-direction: column;
     align-items: flex-start;
@@ -1819,6 +1905,16 @@ h4.skill-cat-title { margin: 0 0 6px; }
 
   .resume-template .resume-row-meta {
     white-space: normal;
+  }
+
+  .resume-template.template-compact .resume-compact-header,
+  .resume-template.template-compact .resume-compact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .resume-template.template-compact .resume-compact-meta {
+    justify-items: start;
+    text-align: left;
   }
 
   input,
