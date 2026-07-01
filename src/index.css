@@ -1787,6 +1787,133 @@ h4.skill-cat-title { margin: 0 0 6px; }
   }
 }
 
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 10px;
+  }
+
+  .app-main {
+    padding: 7px;
+  }
+
+  .panel {
+    padding: 11px;
+  }
+
+  .two-pane {
+    gap: 9px;
+  }
+
+  .preview-head-main,
+  .preview-head-actions,
+  .completion-head,
+  .completion-head-right,
+  .embed-config-row,
+  .embed-link-card-head,
+  .embed-snippet-head {
+    width: 100%;
+  }
+
+  .toolbar-strip,
+  .toolbar-strip-right {
+    width: 100%;
+  }
+
+  .preview-head-main {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .preview-head-actions {
+    justify-content: flex-start;
+  }
+
+  .embed-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .embed-config-item,
+  .embed-height-input,
+  .embed-label,
+  .embed-url {
+    width: 100%;
+  }
+
+  .resume-template.template-compact .resume-compact-header,
+  .resume-template.template-compact .resume-compact-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 0 8px;
+  }
+
+  .app-main {
+    padding: 5px;
+  }
+
+  .panel {
+    padding: 9px;
+  }
+
+  .two-pane {
+    gap: 6px;
+  }
+
+  .brand-row h1 {
+    font-size: 14px;
+  }
+
+  .brand-pill {
+    padding: 2px 6px;
+  }
+
+  .preview-head-main,
+  .completion-head,
+  .toolbar-strip,
+  .toolbar-strip-right,
+  .embed-config-row,
+  .embed-link-card-head,
+  .embed-snippet-head,
+  .section-head,
+  .order-item,
+  .bullet-row,
+  .skill-input-row {
+    gap: 5px;
+  }
+
+  .tool-btn,
+  .embed-icon-btn,
+  .ghost-add,
+  .order-btn,
+  .completion-info-btn {
+    min-width: 0;
+  }
+
+  .score-pill,
+  .completion-pill,
+  .page-indicator,
+  .save-indicator {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+  }
+
+  .resume-template {
+    padding: 12px;
+  }
+
+  .resume-template h1 {
+    font-size: 24px;
+  }
+
+  .resume-template .resume-row {
+    gap: 1px;
+  }
+}
+
 @media (max-width: 640px) {
   .brand-row h1 {
     font-size: 15px;
