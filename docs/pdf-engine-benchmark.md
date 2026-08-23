@@ -16,11 +16,16 @@ This project keeps live preview HTML-first for typing performance, and benchmark
 
 ## How To Run
 
-In dev mode, open the builder and click the lightning icon in the preview toolbar.
+Benchmarks are run programmatically via `benchmarkReactPdfEngine` in `src/pdf/pdfRenderer.tsx` (there is no in-app benchmark button):
 
-- The benchmark runs 4 local iterations by default.
-- A summary toast appears: `PDF bench p50 ...`.
-- Full stats are logged to console in dev mode.
+1. Start the Chromium benchmark server: `npm run bench:server`
+2. Call the local engine from a dev console or script:
+   ```js
+   const { benchmarkReactPdfEngine } = await import('/src/pdf/pdfRenderer.tsx')
+   const stats = await benchmarkReactPdfEngine(resume, 4)
+   console.table(stats)
+   ```
+- A remote comparison runs through the same endpoint contract below.
 
 ### Optional Remote Comparison (Chromium)
 
@@ -38,7 +43,7 @@ Local end-to-end setup:
   - `npm run dev -- --host 127.0.0.1 --port 4174`
 2. In another terminal, start Chromium benchmark server:
   - `PDF_BENCH_PUBLIC_BASE_URL=http://127.0.0.1:4174 npm run bench:server`
-3. Keep `VITE_PDF_BENCHMARK_ENDPOINT` set and use builder lightning benchmark action.
+3. Keep `VITE_PDF_BENCHMARK_ENDPOINT` set and invoke `benchmarkRemotePdfEngine(resume, endpoint)` with the same resume.
 
 Server file:
 

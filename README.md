@@ -4,8 +4,10 @@ CV-Embed is a fast resume builder built with React + TypeScript. It gives you a 
 
 ## Features
 
-- **Resume Builder UI**: Structured sections for basics, education, experience, projects, skills, certifications, accomplishments, activities, volunteering, and publications.
+- **Resume Builder UI**: Structured sections for basics, education, experience, projects, skills, certifications, accomplishments, activities, volunteering, and publications. New resumes start with a basic set (Summary, Education, Experience, Projects, Skills); the rest are opt-in.
 - **Live Preview**: Real-time visual preview while editing with typography, density, and section-order controls.
+- **Formatting Options**: Accent color, font family, font size, line height, heading style, bullet style, date style, and density — applied consistently across the live preview **and** every export format (PDF, DOCX).
+- **Section Visibility & Order**: Toggle sections on/off and reorder them from the nav's organize sheet or the Format panel; the editing form, nav, preview, and all exports stay in sync.
 - **Export Options**: Download polished resumes as **PDF**, **DOCX**, and raw **JSON**.
 - **Embed Toolkit**: Generate a portable embed URL, iframe snippet, and SDK script integration block.
 - **SDK v2 Bridge**: `postMessage` event API (`ready`, `heightChange`, `validationChange`, `sectionFocus`, `export`) with callback hooks.
@@ -15,6 +17,7 @@ CV-Embed is a fast resume builder built with React + TypeScript. It gives you a 
 - **Validation & Scoring**: Inline error/warning checks with a resume quality score indicator.
 - **Draft Persistence**: Saves progress in browser storage so your data survives refreshes.
 - **Portable Data**: Import/export normalized resume JSON for backup and migration.
+- **Performance**: PDF engine (~1.5 MB) is lazy-loaded — on mobile only when you actually export or open the embed panel.
 
 ## Tech Stack
 
@@ -128,6 +131,35 @@ The iframe posts messages shaped like:
 - Open `/sdk-playground.html` to test SDK v2 integrations interactively.
 - It supports render/update/destroy, live event logs, mode/debug toggles, and JSON payload editing.
 
+## Formatting Options
+
+All options live in the Format panel (and section visibility/order also in the nav's organize sheet). Every change applies immediately to the live preview and to PDF/DOCX exports:
+
+| Option | Choices | Notes |
+| --- | --- | --- |
+| Accent Color | Any hex via color picker | Heading + link colors in preview/PDF/DOCX |
+| Font | Bricolage Grotesque, Syne, Azeret Mono, Instrument Serif, Helvetica, Times | Web fonts in preview; closest system font in PDF/DOCX |
+| Size | Small / Normal / Large | Body text scale in all outputs |
+| Line Height | Tight / Normal / Relaxed | All outputs |
+| Headings | Uppercase + Rule / Bold Titles / Minimal | All outputs |
+| Bullets | Dot / Dash | All outputs |
+| Dates | `Jun 2024 - Aug 2025` / `Jun 2024–Aug 2025` | All outputs |
+| Density | Comfortable / Compact / Relaxed | Spacing scale in preview/PDF; DOCX uses line-height equivalent |
+| Link Display | Short label / Full URL | Header links in all outputs |
+| Visibility & Order | Per-section toggle + ↑↓ reorder | Form, nav, preview, and exports share one source of truth |
+
+## Testing & QA
+
+```bash
+npm run test:unit   # Vitest unit tests
+npm run test:e2e    # Playwright tests across desktop-chromium and mobile-chromium
+npm run test        # Both suites
+```
+
+E2E coverage includes builder QoL flows (readiness pill, mobile Edit/Preview toggle, tap-to-open popovers, organize-sheet visibility sync), PDF engine lazy loading per device class, and export menu behavior. CI runs lint, build, unit, and e2e on every push to `main` and on pull requests (`.github/workflows/ci.yml`).
+
+Manual checklists live in `docs/ux-qa-matrix.md`.
+
 ## Manual UX QA
 
 - Use `docs/ux-qa-matrix.md` to verify the 12 high-impact QoL upgrades on desktop and mobile.
@@ -136,25 +168,29 @@ The iframe posts messages shaped like:
 ## PDF Benchmarking
 
 - Use `docs/pdf-engine-benchmark.md` to measure local PDF engine latency and output size.
-- Run benchmarks in dev from the builder toolbar lightning icon.
+- Benchmarks run programmatically via `benchmarkReactPdfEngine` in `src/pdf/pdfRenderer.tsx`; the optional Chromium comparison uses `npm run bench:server`.
 
 ## Project Structure
 
 ```text
 cv-embed/
-├── public/
-├── sdk/
+├── .github/workflows/      # CI (lint, build, unit, e2e)
+├── docs/                   # QA matrix + PDF benchmark guide
+├── public/                 # sdk.js, playground, headers/redirects
+├── scripts/                # Chromium benchmark server
+├── sdk/                    # SDK TypeScript source
 ├── src/
 │   ├── app/                # Builder + embed pages
 │   ├── components/
 │   │   ├── sections/       # Editable resume sections
 │   │   ├── templates/      # Resume templates/renderers
-│   │   └── ui/             # UI icons/components
+│   │   └── ui/             # Icons + shared UI (SectionNav)
 │   ├── docx/               # DOCX renderer
-│   ├── pdf/                # PDF renderer
-│   ├── lib/                # Utils, scoring, storage
-│   ├── schema/             # Validators
+│   ├── pdf/                # PDF renderer (lazy-loaded)
+│   ├── lib/                # Utils, content checks, scoring, storage
+│   ├── schema/             # Zod schema + validators
 │   └── types/              # Resume type definitions
+├── tests/e2e/              # Playwright specs
 ├── package.json
 └── README.md
 ```
