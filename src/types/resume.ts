@@ -182,16 +182,18 @@ export function createDefaultDocumentOptions(): DocumentOptions {
     density: 'comfortable',
     linkDisplay: 'label',
     showSections: {
+      // Basic starter set — optional sections are opt-in via the
+      // "Visibility & Order" controls in the nav or Format panel.
       summary: true,
       education: true,
       experience: true,
       projects: true,
       skills: true,
-      certifications: true,
-      accomplishments: true,
-      activities: true,
-      volunteering: true,
-      publications: true,
+      certifications: false,
+      accomplishments: false,
+      activities: false,
+      volunteering: false,
+      publications: false,
     },
     sectionOrder: [...DEFAULT_SECTION_ORDER],
   }

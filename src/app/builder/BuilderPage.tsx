@@ -695,6 +695,8 @@ export function BuilderPage() {
   ] : []
 
   const scrollTo = (id: SectionId) => {
+    // Hidden sections have no panel to scroll to.
+    if (id !== 'document-options' && !resume.meta.documentOptions.showSections[id as ResumeSectionKey]) return
     setActiveSection(id)
     if (isMobileLayout) setMobileView('edit')
     document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -749,15 +751,23 @@ export function BuilderPage() {
     hidden: s.id !== 'document-options' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
   }))
 
+  // Only render editor panels for sections enabled in the resume; hidden
+  // sections drop out of the nav too so the editing flow matches the output.
+  const visibleNavSections = navSections.filter((s) => !s.hidden)
+
   const jumpToFirstIssue = useCallback(() => {
     const section = nextActionSection
     if (!section) return
+    if (section !== 'document-options' && !resume.meta.documentOptions.showSections[section as ResumeSectionKey]) {
+      // The flagged section is hidden from the resume; nothing to fix there.
+      return
+    }
 
     setActiveSection(section)
     requestAnimationFrame(() => {
       document.getElementById(`section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
-  }, [nextActionSection])
+  }, [nextActionSection, resume.meta.documentOptions.showSections])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -989,7 +999,7 @@ export function BuilderPage() {
         ) : null}
 
         <SectionNav
-          sections={navSections}
+          sections={visibleNavSections}
           organizeOpen={organizeOpen}
           showSections={resume.meta.documentOptions.showSections}
           sectionOrder={resume.meta.documentOptions.sectionOrder}
@@ -1027,33 +1037,51 @@ export function BuilderPage() {
             onMoveSection={moveSectionOrder}
           />
         </div>
+        {resume.meta.documentOptions.showSections.education ? (
         <div id="section-education" className={sectionCls('education')} onMouseDownCapture={() => setActiveSection('education')} onFocusCapture={() => setActiveSection('education')}>
           <EducationSection education={resume.education} onChange={(education) => setResume((p) => ({ ...p, education }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.experience ? (
         <div id="section-experience" className={sectionCls('experience')} onMouseDownCapture={() => setActiveSection('experience')} onFocusCapture={() => setActiveSection('experience')}>
           <ExperienceSection experience={resume.experience} onChange={(experience) => setResume((p) => ({ ...p, experience }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.projects ? (
         <div id="section-projects" className={sectionCls('projects')} onMouseDownCapture={() => setActiveSection('projects')} onFocusCapture={() => setActiveSection('projects')}>
           <ProjectsSection projects={resume.projects} onChange={(projects) => setResume((p) => ({ ...p, projects }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.skills ? (
         <div id="section-skills" className={sectionCls('skills')} onMouseDownCapture={() => setActiveSection('skills')} onFocusCapture={() => setActiveSection('skills')}>
           <SkillsSection skills={resume.skills} onChange={(skills) => setResume((p) => ({ ...p, skills }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.certifications ? (
         <div id="section-certifications" className={sectionCls('certifications')} onMouseDownCapture={() => setActiveSection('certifications')} onFocusCapture={() => setActiveSection('certifications')}>
           <CertificationsSection certifications={resume.certifications} onChange={(certifications) => setResume((p) => ({ ...p, certifications }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.accomplishments ? (
         <div id="section-accomplishments" className={sectionCls('accomplishments')} onMouseDownCapture={() => setActiveSection('accomplishments')} onFocusCapture={() => setActiveSection('accomplishments')}>
           <AccomplishmentsSection accomplishments={resume.accomplishments} onChange={(accomplishments) => setResume((p) => ({ ...p, accomplishments }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.activities ? (
         <div id="section-activities" className={sectionCls('activities')} onMouseDownCapture={() => setActiveSection('activities')} onFocusCapture={() => setActiveSection('activities')}>
           <ActivitiesSection activities={resume.activities} onChange={(activities) => setResume((p) => ({ ...p, activities }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.volunteering ? (
         <div id="section-volunteering" className={sectionCls('volunteering')} onMouseDownCapture={() => setActiveSection('volunteering')} onFocusCapture={() => setActiveSection('volunteering')}>
           <VolunteeringSection volunteering={resume.volunteering} onChange={(volunteering) => setResume((p) => ({ ...p, volunteering }))} />
         </div>
+        ) : null}
+        {resume.meta.documentOptions.showSections.publications ? (
         <div id="section-publications" className={sectionCls('publications')} onMouseDownCapture={() => setActiveSection('publications')} onFocusCapture={() => setActiveSection('publications')}>
           <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />
         </div>
+        ) : null}
       </section>
       ) : null}
 

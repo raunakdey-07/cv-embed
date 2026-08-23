@@ -86,13 +86,26 @@ test.describe('Builder QoL flows', () => {
     const sheet = page.locator('.organize-sheet')
     await expect(sheet).toBeVisible()
 
-    // Hide Education via the sheet; its nav tab should reflect the hidden state.
+    // Basic defaults: optional sections start disabled.
+    await expect(page.locator('#section-certifications')).toHaveCount(0)
+    await expect(page.locator('.nav-tab', { hasText: 'Certs' })).toHaveCount(0)
+
+    // Enabling a section adds its editor panel and nav tab immediately.
+    await sheet.locator('.order-item', { hasText: 'Certifications' }).locator('input[type="checkbox"]').check()
+    await expect(page.locator('#section-certifications')).toBeVisible()
+    await expect(page.locator('.nav-tab', { hasText: 'Certs' })).toBeVisible()
+
+    // Disabling removes both again.
+    await sheet.locator('.order-item', { hasText: 'Certifications' }).locator('input[type="checkbox"]').uncheck()
+    await expect(page.locator('#section-certifications')).toHaveCount(0)
+    await expect(page.locator('.nav-tab', { hasText: 'Certs' })).toHaveCount(0)
+
+    // Core sections behave the same way (Education is on by default).
     const educationToggle = sheet.locator('.order-item', { hasText: 'Education' }).locator('input[type="checkbox"]')
     await educationToggle.uncheck()
-    await expect(page.locator('.nav-tab', { hasText: 'Education' })).toHaveClass(/is-hidden-section/)
-
-    // Re-check from the Format panel: same shared state.
-    await sheet.locator('.order-item', { hasText: 'Education' }).locator('input[type="checkbox"]').check()
-    await expect(page.locator('.nav-tab', { hasText: 'Education' })).not.toHaveClass(/is-hidden-section/)
+    await expect(page.locator('#section-education')).toHaveCount(0)
+    await expect(page.locator('.nav-tab', { hasText: 'Education' })).toHaveCount(0)
+    await educationToggle.check()
+    await expect(page.locator('#section-education')).toBeVisible()
   })
 })
