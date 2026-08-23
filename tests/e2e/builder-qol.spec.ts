@@ -26,19 +26,73 @@ test.describe('Builder QoL flows', () => {
 
     await page.goto('/builder')
 
-    await expect(page.locator('.preview-head-main .section-title').getByText('Preview')).toBeVisible()
     await expect(page.getByText('Resume Readiness')).toBeVisible()
 
-    const leftPane = page.locator('.left-pane')
-    const rightPane = page.locator('.right-pane')
-    const [leftBox, rightBox] = await Promise.all([leftPane.boundingBox(), rightPane.boundingBox()])
-    expect(leftBox).not.toBeNull()
-    expect(rightBox).not.toBeNull()
-    expect(leftBox!.y).toBeLessThan(rightBox!.y)
+    // Mobile shows an Edit/Preview toggle; Edit is the default view.
+    const toggle = page.locator('.mobile-view-toggle')
+    await expect(toggle).toBeVisible()
+    const editTab = toggle.getByRole('tab', { name: 'Edit' })
+    const previewTab = toggle.getByRole('tab', { name: 'Preview' })
+    await expect(editTab).toHaveClass(/active/)
+    await expect(page.locator('.left-pane')).toBeVisible()
+    await expect(page.locator('.right-pane')).toHaveCount(0)
+
+    // Switching to Preview swaps the panes.
+    await previewTab.click()
+    await expect(previewTab).toHaveClass(/active/)
+    await expect(page.locator('.right-pane')).toBeVisible()
+    await expect(page.locator('.left-pane')).toHaveCount(0)
+    await expect(page.locator('.preview-head-main .section-title').getByText('Preview')).toBeVisible()
+
+    // Back to Edit for the export-menu flow.
+    await editTab.click()
+    await expect(page.locator('.left-pane')).toBeVisible()
 
     const exportButton = page.locator('.preview-head .tool-btn[title="Export resume"]')
-    await expect(exportButton).toBeVisible()
-    await exportButton.click()
-    await expect(page.locator('.export-dropdown')).toBeVisible()
+    await expect(exportButton).toHaveCount(0)
+  })
+
+  test('mobile: info popovers open on tap', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'mobile-only flow')
+
+    await page.goto('/builder')
+    await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+    const infoBtn = page.locator('.completion-info-btn')
+    await infoBtn.click()
+    await expect(page.locator('.completion-info-popover')).toBeVisible()
+    await expect(page.locator('.completion-info-popover')).toContainText('sections complete')
+
+    // Tap outside closes it.
+    await page.locator('.mobile-view-toggle').click()
+    await expect(page.locator('.completion-info-popover')).toBeHidden()
+  })
+
+  test('mobile: section nav organize sheet toggles visibility and order', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'mobile-only flow')
+
+    await page.goto('/builder')
+    await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+    const organizeBtn = page.locator('.organize-btn')
+    await expect(organizeBtn).toBeVisible()
+
+    // Touch targets should be at least 40px tall.
+    const tabBox = await page.locator('.nav-tab').first().boundingBox()
+    expect(tabBox).not.toBeNull()
+    expect(tabBox!.height).toBeGreaterThanOrEqual(40)
+
+    await organizeBtn.click()
+    const sheet = page.locator('.organize-sheet')
+    await expect(sheet).toBeVisible()
+
+    // Hide Education via the sheet; its nav tab should reflect the hidden state.
+    const educationToggle = sheet.locator('.order-item', { hasText: 'Education' }).locator('input[type="checkbox"]')
+    await educationToggle.uncheck()
+    await expect(page.locator('.nav-tab', { hasText: 'Education' })).toHaveClass(/is-hidden-section/)
+
+    // Re-check from the Format panel: same shared state.
+    await sheet.locator('.order-item', { hasText: 'Education' }).locator('input[type="checkbox"]').check()
+    await expect(page.locator('.nav-tab', { hasText: 'Education' })).not.toHaveClass(/is-hidden-section/)
   })
 })

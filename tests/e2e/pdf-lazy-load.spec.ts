@@ -46,8 +46,11 @@ test.describe('PDF engine lazy loading', () => {
     await page.waitForTimeout(5000)
     expect(pdfRequests).toEqual([])
 
-    // Opening the export menu is the on-demand trigger.
+    // Opening the export menu is the on-demand trigger (switch to Preview
+    // first — that's where the toolbar lives on mobile).
+    await page.locator('.mobile-view-toggle').getByRole('tab', { name: 'Preview' }).click()
     const exportButton = page.locator('.preview-head .tool-btn[title="Export resume"]')
+    await expect(exportButton).toBeVisible()
     await exportButton.click()
     await expect(page.locator('.export-dropdown')).toBeVisible()
     await expect.poll(() => pdfRequests.length, { timeout: 15_000 }).toBeGreaterThan(0)

@@ -273,6 +273,10 @@ button {
   white-space: nowrap;
 }
 
+button.score-pill {
+  cursor: pointer;
+}
+
 .score-pill-secondary {
   color: var(--text-2);
   background: var(--surface-2);
@@ -884,13 +888,21 @@ button {
 
 .section-nav {
   display: flex;
+  align-items: center;
   gap: 1px;
   padding: 3px;
   background: var(--surface);
   border: 1px solid var(--border-dim);
   border-radius: var(--r-lg);
   flex-shrink: 0;
+}
+
+.section-nav-tabs {
+  display: flex;
+  gap: 1px;
   overflow-x: auto;
+  flex: 1;
+  min-width: 0;
 }
 
 .nav-tab {
@@ -905,7 +917,7 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  transition: color 0.12s, background 0.12s;
+  transition: color 0.12s, background 0.12s, opacity 0.12s;
 }
 
 .nav-tab:hover {
@@ -918,8 +930,60 @@ button {
   background: var(--accent-dim);
 }
 
+.nav-tab.is-hidden-section {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-color: var(--text-3);
+}
+
 .nav-tab span {
   font-size: 10px;
+}
+
+.organize-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.organize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 7px;
+  border-radius: var(--r);
+  color: var(--text-3);
+  transition: color 0.12s, background 0.12s;
+}
+
+.organize-btn:hover,
+.organize-btn.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.organize-sheet {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(280px, calc(100vw - 28px));
+  max-height: min(420px, calc(100vh - 120px));
+  overflow-y: auto;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 10px;
+  z-index: 50;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.organize-sheet-title {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  margin-bottom: 8px;
 }
 
 /* ═══════════════════════ Section Shell (focus mode) ═══════════════════════ */
@@ -1558,6 +1622,56 @@ h4.skill-cat-title { margin: 0 0 6px; }
   border-color: var(--accent);
 }
 
+/* ═══════════════════════ Mobile View Toggle ═══════════════════════ */
+
+.mobile-view-toggle {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mobile-view-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    padding: 3px;
+    background: var(--surface);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-lg);
+    position: sticky;
+    top: 6px;
+    z-index: 20;
+  }
+
+  .mobile-view-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    border-radius: var(--r);
+    font-family: 'Azeret Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-3);
+    transition: color 0.12s, background 0.12s;
+  }
+
+  .mobile-view-tab:hover {
+    color: var(--text-2);
+    background: var(--surface-2);
+  }
+
+  .mobile-view-tab.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  /* Only the active pane renders on mobile; drop the old stacking order. */
+  .right-pane { order: initial; }
+  .left-pane { order: initial; }
+}
+
 /* ═══════════════════════ Responsive ═══════════════════════ */
 
 @media (max-width: 1100px) {
@@ -1655,14 +1769,6 @@ h4.skill-cat-title { margin: 0 0 6px; }
   .left-pane,
   .right-pane {
     width: 100%;
-  }
-
-  .right-pane {
-    order: 2;
-  }
-
-  .left-pane {
-    order: 1;
   }
 
   .right-pane.panel {
@@ -1784,10 +1890,21 @@ h4.skill-cat-title { margin: 0 0 6px; }
 }
 
 @media (hover: none), (pointer: coarse) {
+  /* Hover is unavailable on touch devices; popovers open via tap instead
+     (the .is-open class is set by BuilderPage popover state). */
   .score-help-popover,
   .completion-pill-popover,
   .completion-info-popover {
     display: none;
+  }
+
+  .score-hover-wrap.is-open .score-help-popover,
+  .completion-pill-wrap.is-open .completion-pill-popover,
+  .completion-info-wrap.is-open .completion-info-popover {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
   }
 }
 
@@ -1806,6 +1923,18 @@ h4.skill-cat-title { margin: 0 0 6px; }
 
   .two-pane {
     gap: 9px;
+  }
+
+  /* Comfortable touch targets for nav tabs and organize button */
+  .nav-tab {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  .organize-btn {
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
   }
 
   /* Tighten header rows that still have spare space between 900–640px */

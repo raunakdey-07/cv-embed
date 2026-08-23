@@ -21,7 +21,8 @@ import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
 import { loadDraft, saveDraft } from '../../lib/storage'
 import { resolveNextActionSection } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
-import { createEmptyResume, type Resume } from '../../types/resume'
+import { createEmptyResume, type DocumentOptions, type Resume, type ResumeSectionKey } from '../../types/resume'
+import { SectionNav, type NavSection } from '../../components/ui/SectionNav'
 
 
 function normalizeBaseUrl(value: string): string {
@@ -226,6 +227,7 @@ const DRAFT_SAVE_DEBOUNCE_MS = 900
 export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const exportRef = useRef<HTMLDivElement>(null)
+  const popoverZoneRef = useRef<HTMLDivElement>(null)
   const pageCountCacheRef = useRef<Map<string, number>>(new Map())
   const pageCountJobRef = useRef(0)
   const pageCountDelayTimerRef = useRef<number | null>(null)
@@ -237,6 +239,10 @@ export function BuilderPage() {
   const [copyState, setCopyState] = useState('')
   const [activeSection, setActiveSection] = useState<SectionId>('basics')
   const [exportOpen, setExportOpen] = useState(false)
+  const [openPopover, setOpenPopover] = useState<'info' | 'fixNext' | 'clean' | 'score' | null>(null)
+  const [organizeOpen, setOrganizeOpen] = useState(false)
+  const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
+  const scoreZoneRef = useRef<HTMLDivElement>(null)
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [isPageEstimateStale, setIsPageEstimateStale] = useState(false)
   const [isPageEstimating, setIsPageEstimating] = useState(false)
@@ -272,10 +278,23 @@ export function BuilderPage() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
+      if (popoverZoneRef.current && !popoverZoneRef.current.contains(e.target as Node)) setOpenPopover(null)
+      if (scoreZoneRef.current && !scoreZoneRef.current.contains(e.target as Node)) {
+        setOpenPopover((p) => (p === 'score' ? null : p))
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useEffect(() => {
+    if (!openPopover) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenPopover(null)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [openPopover])
 
   useEffect(() => {
     localStorage.setItem('cv-embed:public-base-url', normalizeBaseUrl(embedBaseUrl))
@@ -677,11 +696,58 @@ export function BuilderPage() {
 
   const scrollTo = (id: SectionId) => {
     setActiveSection(id)
+    if (isMobileLayout) setMobileView('edit')
     document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
   const sectionCls = (id: SectionId) =>
     `section-shell ${activeSection === id ? 'is-active' : ''}`
+
+  const toggleSectionVisibility = useCallback((sectionId: keyof DocumentOptions['showSections']) => {
+    setResume((p) => ({
+      ...p,
+      meta: {
+        ...p.meta,
+        documentOptions: {
+          ...p.meta.documentOptions,
+          showSections: {
+            ...p.meta.documentOptions.showSections,
+            [sectionId]: !p.meta.documentOptions.showSections[sectionId],
+          },
+        },
+      },
+    }))
+  }, [])
+
+  const moveSectionOrder = useCallback((sectionId: keyof DocumentOptions['showSections'], direction: -1 | 1) => {
+    setResume((p) => {
+      const order = p.meta.documentOptions.sectionOrder
+      const currentIndex = order.indexOf(sectionId)
+      const targetIndex = currentIndex + direction
+      if (currentIndex === -1 || targetIndex < 0 || targetIndex >= order.length) return p
+
+      const next = [...order]
+      const [picked] = next.splice(currentIndex, 1)
+      next.splice(targetIndex, 0, picked)
+      return {
+        ...p,
+        meta: {
+          ...p.meta,
+          documentOptions: {
+            ...p.meta.documentOptions,
+            sectionOrder: next,
+          },
+        },
+      }
+    })
+  }, [])
+
+  const navSections: NavSection[] = SECTION_NAV.map((s) => ({
+    id: s.id,
+    label: s.label,
+    active: activeSection === s.id,
+    hidden: s.id !== 'document-options' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
+  }))
 
   const jumpToFirstIssue = useCallback(() => {
     const section = nextActionSection
@@ -726,17 +792,50 @@ export function BuilderPage() {
 
   return (
     <main className={`app-main two-pane ${isMobileLayout ? 'is-mobile-layout' : ''}`}>
+      {isMobileLayout ? (
+        <div className="mobile-view-toggle" role="tablist" aria-label="Builder view">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileView === 'edit'}
+            className={`mobile-view-tab ${mobileView === 'edit' ? 'active' : ''}`}
+            onClick={() => setMobileView('edit')}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileView === 'preview'}
+            className={`mobile-view-tab ${mobileView === 'preview' ? 'active' : ''}`}
+            onClick={() => setMobileView('preview')}
+          >
+            Preview
+          </button>
+        </div>
+      ) : null}
+
+      {!isMobileLayout || mobileView === 'edit' ? (
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
 
-        <div className="completion-strip" title="Readiness based on section coverage, essentials, and validation state">
+        <div className="completion-strip" ref={popoverZoneRef} title="Readiness based on section coverage, essentials, and validation state">
           <div className="completion-head">
             <div className="completion-title-group">
               <div className="completion-title-row">
                 <span className="completion-title">Resume Readiness</span>
                 <span className="completion-inline-tools">
-                  <span className="completion-info-wrap" tabIndex={0} aria-label="Readiness details">
-                    <button type="button" className="completion-info-btn">i</button>
+                  <span
+                    className={`completion-info-wrap${openPopover === 'info' ? ' is-open' : ''}`}
+                    tabIndex={0}
+                    aria-label="Readiness details"
+                  >
+                    <button
+                      type="button"
+                      className="completion-info-btn"
+                      aria-expanded={openPopover === 'info'}
+                      onClick={() => setOpenPopover((p) => (p === 'info' ? null : 'info'))}
+                    >i</button>
                     <span className="completion-pill-popover completion-info-popover" role="tooltip">
                       {completion.done}/{completion.total} sections complete • Essentials {completion.essentialsDone}/{completion.essentialsTotal}
                     </span>
@@ -746,13 +845,25 @@ export function BuilderPage() {
             </div>
             <div className="completion-head-right">
               {issueSummary.total > 0 ? (
-                <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
+                <div
+                  className={`completion-pill-wrap${openPopover === 'fixNext' ? ' is-open' : ''}`}
+                  tabIndex={0}
+                  aria-label="Issue guidance"
+                >
                   <button
                     type="button"
                     className={`completion-pill completion-pill-action completion-pill-compact ${issueSummary.severity === 'errors' ? 'error' : 'warn'}`}
                     title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
                     aria-label="Fix next issue"
-                    onClick={jumpToFirstIssue}
+                    aria-expanded={openPopover === 'fixNext'}
+                    onClick={() => {
+                      if (openPopover === 'fixNext') {
+                        jumpToFirstIssue()
+                        setOpenPopover(null)
+                      } else {
+                        setOpenPopover('fixNext')
+                      }
+                    }}
                   >
                     <IconAlertTriangle size={10} /> {issueSummary.label}
                   </button>
@@ -761,10 +872,19 @@ export function BuilderPage() {
                   </div>
                 </div>
               ) : (
-                <div className="completion-pill-wrap" tabIndex={0} aria-label="Issue guidance">
-                  <span className="completion-pill completion-pill-compact ok">
+                <div
+                  className={`completion-pill-wrap${openPopover === 'clean' ? ' is-open' : ''}`}
+                  tabIndex={0}
+                  aria-label="Issue guidance"
+                >
+                  <button
+                    type="button"
+                    className="completion-pill completion-pill-compact ok"
+                    aria-expanded={openPopover === 'clean'}
+                    onClick={() => setOpenPopover((p) => (p === 'clean' ? null : 'clean'))}
+                  >
                     <IconCheck size={10} /> Clean
-                  </span>
+                  </button>
                   <div className="completion-pill-popover" role="tooltip">
                     No validation issues right now. Next action: add measurable outcomes to improve overall quality.
                   </div>
@@ -868,13 +988,17 @@ export function BuilderPage() {
           </div>
         ) : null}
 
-        <nav className="section-nav">
-          {SECTION_NAV.map((s) => (
-            <button key={s.id} className={`nav-tab ${activeSection === s.id ? 'active' : ''}`} onClick={() => scrollTo(s.id)}>
-              <s.Icon size={13} /><span>{s.label}</span>
-            </button>
-          ))}
-        </nav>
+        <SectionNav
+          sections={navSections}
+          organizeOpen={organizeOpen}
+          showSections={resume.meta.documentOptions.showSections}
+          sectionOrder={resume.meta.documentOptions.sectionOrder}
+          onToggleSection={toggleSectionVisibility}
+          onMoveSection={moveSectionOrder}
+          onSelect={(id) => scrollTo(id as SectionId)}
+          onOrganizeToggle={() => setOrganizeOpen((o) => !o)}
+          onOrganizeClose={() => setOrganizeOpen(false)}
+        />
 
         <div id="section-basics" className={sectionCls('basics')} onMouseDownCapture={() => setActiveSection('basics')} onFocusCapture={() => setActiveSection('basics')}>
           <BasicsSection
@@ -896,7 +1020,12 @@ export function BuilderPage() {
           />
         </div>
         <div id="section-document-options" className={sectionCls('document-options')} onMouseDownCapture={() => setActiveSection('document-options')} onFocusCapture={() => setActiveSection('document-options')}>
-          <DocumentOptionsSection options={resume.meta.documentOptions} onChange={(documentOptions) => setResume((p) => ({ ...p, meta: { ...p.meta, documentOptions } }))} />
+          <DocumentOptionsSection
+            options={resume.meta.documentOptions}
+            onChange={(documentOptions) => setResume((p) => ({ ...p, meta: { ...p.meta, documentOptions } }))}
+            onToggleSection={toggleSectionVisibility}
+            onMoveSection={moveSectionOrder}
+          />
         </div>
         <div id="section-education" className={sectionCls('education')} onMouseDownCapture={() => setActiveSection('education')} onFocusCapture={() => setActiveSection('education')}>
           <EducationSection education={resume.education} onChange={(education) => setResume((p) => ({ ...p, education }))} />
@@ -926,7 +1055,9 @@ export function BuilderPage() {
           <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />
         </div>
       </section>
+      ) : null}
 
+      {!isMobileLayout || mobileView === 'preview' ? (
       <section className={`right-pane panel ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <div className="preview-head">
           <div className="preview-head-main">
@@ -965,8 +1096,21 @@ export function BuilderPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="score-hover-wrap" tabIndex={0} aria-label="Scoring rubric">
-                <span className="score-pill" title={qualityScoreLabel}>{qualityScoreLabel}</span>
+              <div
+                className={`score-hover-wrap${openPopover === 'score' ? ' is-open' : ''}`}
+                ref={scoreZoneRef}
+                tabIndex={0}
+                aria-label="Scoring rubric"
+              >
+                <button
+                  type="button"
+                  className="score-pill"
+                  title={qualityScoreLabel}
+                  aria-expanded={openPopover === 'score'}
+                  onClick={() => setOpenPopover((p) => (p === 'score' ? null : 'score'))}
+                >
+                  {qualityScoreLabel}
+                </button>
                 <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
                   <p className="score-help-title">Scoring Rubric</p>
                   <ul>
@@ -983,6 +1127,7 @@ export function BuilderPage() {
           <TemplateRenderer resume={resume} />
         </div>
       </section>
+      ) : null}
     </main>
   )
 }

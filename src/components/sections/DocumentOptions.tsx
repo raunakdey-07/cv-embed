@@ -4,9 +4,11 @@ import { DEFAULT_SECTION_ORDER, type DocumentOptions } from '../../types/resume'
 interface DocumentOptionsSectionProps {
   options: DocumentOptions
   onChange: (next: DocumentOptions) => void
+  onToggleSection: (sectionId: keyof DocumentOptions['showSections']) => void
+  onMoveSection: (sectionId: keyof DocumentOptions['showSections'], direction: -1 | 1) => void
 }
 
-export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSectionProps) {
+export function DocumentOptionsSection({ options, onChange, onToggleSection, onMoveSection }: DocumentOptionsSectionProps) {
   const update = <K extends keyof DocumentOptions>(key: K, value: DocumentOptions[K]) => {
     onChange({ ...options, [key]: value })
   }
@@ -22,29 +24,6 @@ export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSec
     activities: 'Activities',
     volunteering: 'Volunteering',
     publications: 'Publications',
-  }
-
-  const toggleSection = (sectionId: keyof DocumentOptions['showSections']) => {
-    onChange({
-      ...options,
-      showSections: {
-        ...options.showSections,
-        [sectionId]: !options.showSections[sectionId],
-      },
-    })
-  }
-
-  const moveSection = (sectionId: keyof DocumentOptions['showSections'], direction: -1 | 1) => {
-    const currentIndex = options.sectionOrder.indexOf(sectionId)
-    const targetIndex = currentIndex + direction
-    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= options.sectionOrder.length) {
-      return
-    }
-
-    const next = [...options.sectionOrder]
-    const [picked] = next.splice(currentIndex, 1)
-    next.splice(targetIndex, 0, picked)
-    update('sectionOrder', next)
   }
 
   const orderedSections = options.sectionOrder.length > 0 ? options.sectionOrder : DEFAULT_SECTION_ORDER
@@ -116,12 +95,12 @@ export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSec
         {orderedSections.map((sectionId, index) => (
           <div className="order-item" key={sectionId}>
             <label className="order-toggle">
-              <input type="checkbox" checked={options.showSections[sectionId]} onChange={() => toggleSection(sectionId)} />
+              <input type="checkbox" checked={options.showSections[sectionId]} onChange={() => onToggleSection(sectionId)} />
               <span>{labels[sectionId]}</span>
             </label>
             <div className="order-actions">
-              <button type="button" className="order-btn" onClick={() => moveSection(sectionId, -1)} disabled={index === 0} title="Move up">↑</button>
-              <button type="button" className="order-btn" onClick={() => moveSection(sectionId, 1)} disabled={index === orderedSections.length - 1} title="Move down">↓</button>
+              <button type="button" className="order-btn" onClick={() => onMoveSection(sectionId, -1)} disabled={index === 0} title="Move up">↑</button>
+              <button type="button" className="order-btn" onClick={() => onMoveSection(sectionId, 1)} disabled={index === orderedSections.length - 1} title="Move down">↓</button>
             </div>
           </div>
         ))}
