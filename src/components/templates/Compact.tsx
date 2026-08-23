@@ -1,5 +1,18 @@
 import type { Resume, ResumeSectionKey } from '../../types/resume'
 import type { CSSProperties } from 'react'
+import {
+  hasAccomplishmentItem,
+  hasActivityItem,
+  hasCertificationItem,
+  hasContent,
+  hasEducationItem,
+  hasExperienceItem,
+  hasProjectItem,
+  hasPublicationItem,
+  hasSkills,
+  hasText,
+  hasVolunteeringItem,
+} from '../../lib/contentChecks'
 import { formatDateRangeByStyle, formatSingleDate } from '../../lib/utils'
 import { DEFAULT_SECTION_ORDER } from '../../types/resume'
 
@@ -8,48 +21,6 @@ interface CompactTemplateProps {
   primaryColor?: string
   densityMode?: 'comfortable' | 'compact' | 'relaxed'
 }
-
-function hasContent<T extends object>(items: T[]): boolean {
-  return items.some((item) =>
-    Object.values(item as Record<string, unknown>).some((value) =>
-      Array.isArray(value)
-        ? value.some((entry) => (typeof entry === 'string' ? entry.trim() !== '' : true))
-        : typeof value === 'string'
-          ? value.trim() !== ''
-          : false,
-    ),
-  )
-}
-
-function hasSkills(skills: Resume['skills']): boolean {
-  return skills.languages.length > 0 || skills.frameworks.length > 0 || skills.tools.length > 0 || skills.other.length > 0
-}
-
-const hasText = (value: string) => value.trim() !== ''
-
-const hasEducationItem = (item: Resume['education'][number]) =>
-  [item.institution, item.degree, item.field, item.cgpa, item.startDate, item.endDate, item.location].some(hasText)
-
-const hasExperienceItem = (item: Resume['experience'][number]) =>
-  [item.company, item.role, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)
-
-const hasProjectItem = (item: Resume['projects'][number]) =>
-  [item.title, item.projectLink, item.repoLink, item.startDate, item.endDate].some(hasText) || item.techStack.length > 0 || item.bullets.some(hasText)
-
-const hasCertificationItem = (item: Resume['certifications'][number]) =>
-  [item.title, item.issuer, item.date, item.credentialId, item.credentialUrl].some(hasText)
-
-const hasAccomplishmentItem = (item: Resume['accomplishments'][number]) =>
-  [item.title, item.organization, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)
-
-const hasActivityItem = (item: Resume['activities'][number]) =>
-  [item.role, item.organization, item.location, item.startDate, item.endDate, item.referenceUrl].some(hasText)
-
-const hasVolunteeringItem = (item: Resume['volunteering'][number]) =>
-  [item.role, item.organization, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)
-
-const hasPublicationItem = (item: Resume['publications'][number]) =>
-  [item.title, item.venue, item.date, item.url].some(hasText)
 
 const PRIMARY_SECTIONS: ResumeSectionKey[] = ['summary', 'experience', 'projects']
 

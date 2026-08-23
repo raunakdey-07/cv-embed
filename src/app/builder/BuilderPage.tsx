@@ -414,9 +414,13 @@ export function BuilderPage() {
   }, [clearScheduledPageCount, resume])
 
   useEffect(() => {
+    // On the mobile layout the preview sits below the form, so a background
+    // page estimate would pull in the ~1.5 MB PDF engine for data most users
+    // never look at while filling the form. Estimate only on demand there.
+    if (isMobileLayout) return
     schedulePageEstimate('idle')
     return () => clearScheduledPageCount()
-  }, [clearScheduledPageCount, schedulePageEstimate])
+  }, [clearScheduledPageCount, isMobileLayout, schedulePageEstimate])
 
   useEffect(() => {
     if (exportOpen || isEmbedPanelOpen) {
@@ -621,11 +625,24 @@ export function BuilderPage() {
     downloadJson(resume)
   }, [resume])
 
-  const copyTo = async (label: string, value: string) => {
+  const copyToastTimerRef = useRef<number | null>(null)
+  const copyTo = useCallback(async (label: string, value: string) => {
     await navigator.clipboard.writeText(value)
     setCopyState(`${label} copied`)
-    setTimeout(() => setCopyState(''), 1800)
-  }
+    if (copyToastTimerRef.current !== null) {
+      window.clearTimeout(copyToastTimerRef.current)
+    }
+    copyToastTimerRef.current = window.setTimeout(() => {
+      copyToastTimerRef.current = null
+      setCopyState('')
+    }, 1800)
+  }, [])
+
+  useEffect(() => () => {
+    if (copyToastTimerRef.current !== null) {
+      window.clearTimeout(copyToastTimerRef.current)
+    }
+  }, [])
 
   const embedSnippetCards = embedArtifacts ? [
     {
@@ -707,12 +724,8 @@ export function BuilderPage() {
     return () => window.removeEventListener('keydown', handler)
   }, [busy, createEmbedLink, jumpToFirstIssue, onDownloadPdf])
 
-  const showEditPane = true
-  const showPreviewPane = true
-
   return (
     <main className={`app-main two-pane ${isMobileLayout ? 'is-mobile-layout' : ''}`}>
-      {showEditPane ? (
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
 
@@ -913,9 +926,7 @@ export function BuilderPage() {
           <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />
         </div>
       </section>
-      ) : null}
 
-      {showPreviewPane ? (
       <section className={`right-pane panel ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
         <div className="preview-head">
           <div className="preview-head-main">
@@ -972,7 +983,6 @@ export function BuilderPage() {
           <TemplateRenderer resume={resume} />
         </div>
       </section>
-      ) : null}
     </main>
   )
 }

@@ -1,4 +1,17 @@
 import type { CSSProperties } from 'react'
+import {
+  hasAccomplishmentItem,
+  hasActivityItem,
+  hasCertificationItem,
+  hasContent,
+  hasEducationItem,
+  hasExperienceItem,
+  hasProjectItem,
+  hasPublicationItem,
+  hasSkills,
+  hasText,
+  hasVolunteeringItem,
+} from '../../lib/contentChecks'
 import { formatDateRangeByStyle, formatSingleDate } from '../../lib/utils'
 import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../../types/resume'
 
@@ -7,44 +20,6 @@ interface MinimalTemplateProps {
   primaryColor?: string
   densityMode?: 'comfortable' | 'compact' | 'relaxed'
 }
-
-function hasContent<T extends object>(items: T[]): boolean {
-  return items.some((item) =>
-    Object.values(item as Record<string, unknown>).some((v) =>
-      Array.isArray(v) ? v.some((x) => typeof x === 'string' ? x.trim() !== '' : true) : typeof v === 'string' ? v.trim() !== '' : false,
-    ),
-  )
-}
-
-function hasSkills(s: Resume['skills']): boolean {
-  return s.languages.length > 0 || s.frameworks.length > 0 || s.tools.length > 0 || s.other.length > 0
-}
-
-const hasText = (value: string) => value.trim() !== ''
-
-const hasEducationItem = (item: Resume['education'][number]) =>
-  [item.institution, item.degree, item.field, item.cgpa, item.startDate, item.endDate, item.location].some(hasText)
-
-const hasExperienceItem = (item: Resume['experience'][number]) =>
-  [item.company, item.role, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)
-
-const hasProjectItem = (item: Resume['projects'][number]) =>
-  [item.title, item.projectLink, item.repoLink, item.startDate, item.endDate].some(hasText) || item.techStack.length > 0 || item.bullets.some(hasText)
-
-const hasCertificationItem = (item: Resume['certifications'][number]) =>
-  [item.title, item.issuer, item.date, item.credentialId, item.credentialUrl].some(hasText)
-
-const hasAccomplishmentItem = (item: Resume['accomplishments'][number]) =>
-  [item.title, item.organization, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)
-
-const hasActivityItem = (item: Resume['activities'][number]) =>
-  [item.role, item.organization, item.location, item.startDate, item.endDate, item.referenceUrl].some(hasText)
-
-const hasVolunteeringItem = (item: Resume['volunteering'][number]) =>
-  [item.role, item.organization, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)
-
-const hasPublicationItem = (item: Resume['publications'][number]) =>
-  [item.title, item.venue, item.date, item.url].some(hasText)
 
 export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortable' }: MinimalTemplateProps) {
   const options = resume.meta.documentOptions
