@@ -1,32 +1,15 @@
 import { IconSliders } from '../ui/Icons'
-import { DEFAULT_SECTION_ORDER, type DocumentOptions } from '../../types/resume'
+import type { DocumentOptions } from '../../types/resume'
 
 interface DocumentOptionsSectionProps {
   options: DocumentOptions
   onChange: (next: DocumentOptions) => void
-  onToggleSection: (sectionId: keyof DocumentOptions['showSections']) => void
-  onMoveSection: (sectionId: keyof DocumentOptions['showSections'], direction: -1 | 1) => void
 }
 
-export function DocumentOptionsSection({ options, onChange, onToggleSection, onMoveSection }: DocumentOptionsSectionProps) {
+export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSectionProps) {
   const update = <K extends keyof DocumentOptions>(key: K, value: DocumentOptions[K]) => {
     onChange({ ...options, [key]: value })
   }
-
-  const labels: Record<keyof DocumentOptions['showSections'], string> = {
-    summary: 'Summary',
-    education: 'Education',
-    experience: 'Experience',
-    projects: 'Projects',
-    skills: 'Skills',
-    certifications: 'Certifications',
-    accomplishments: 'Accomplishments',
-    activities: 'Activities',
-    volunteering: 'Volunteering',
-    publications: 'Publications',
-  }
-
-  const orderedSections = options.sectionOrder.length > 0 ? options.sectionOrder : DEFAULT_SECTION_ORDER
 
   return (
     <section className="panel">
@@ -77,6 +60,9 @@ export function DocumentOptionsSection({ options, onChange, onToggleSection, onM
           <select value={options.dateStyle} onChange={(e) => update('dateStyle', e.target.value as DocumentOptions['dateStyle'])}>
             <option value="range">Jun 2024 - Aug 2025</option>
             <option value="compact">Jun 2024–Aug 2025</option>
+            <option value="short">Jun 2024 – Aug 2025 (month first)</option>
+            <option value="numeric">06/2024 – 08/2025</option>
+            <option value="iso">2024-06 – 2025-08</option>
           </select>
         </label>
         <label>Density
@@ -86,24 +72,6 @@ export function DocumentOptionsSection({ options, onChange, onToggleSection, onM
             <option value="relaxed">Relaxed</option>
           </select>
         </label>
-      </div>
-
-      <div className="section-head sub">
-        <span className="section-title">Visibility & Order</span>
-      </div>
-      <div className="order-list">
-        {orderedSections.map((sectionId, index) => (
-          <div className="order-item" key={sectionId}>
-            <label className="order-toggle">
-              <input type="checkbox" checked={options.showSections[sectionId]} onChange={() => onToggleSection(sectionId)} />
-              <span>{labels[sectionId]}</span>
-            </label>
-            <div className="order-actions">
-              <button type="button" className="order-btn" onClick={() => onMoveSection(sectionId, -1)} disabled={index === 0} title="Move up">↑</button>
-              <button type="button" className="order-btn" onClick={() => onMoveSection(sectionId, 1)} disabled={index === orderedSections.length - 1} title="Move down">↓</button>
-            </div>
-          </div>
-        ))}
       </div>
     </section>
   )

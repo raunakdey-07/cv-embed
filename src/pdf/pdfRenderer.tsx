@@ -127,6 +127,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
   const styles = getPdfStyleConfig(resume)
   const bulletPrefix = options.bulletStyle === 'dash' ? '—' : '•'
   const dateValue = (startDate: string, endDate: string) => formatDateRangeByStyle(startDate, endDate, options.dateStyle)
+  const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)
   const linkValue = (label: string, url: string) => (options.linkDisplay === 'url' ? url : label || url)
   const sectionOrder = [...new Set([...(options.sectionOrder ?? []), ...DEFAULT_SECTION_ORDER])]
 
@@ -212,7 +213,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           <View style={styles.section} key="certifications">
             <Text style={styles.sectionTitle}>Certifications</Text>
             {resume.certifications.filter(hasCertificationItem).map((item, index) => {
-              const date = formatSingleDate(item.date)
+              const date = singleDate(item.date)
               const details = [
                 item.credentialId ? `ID: ${item.credentialId}` : '',
                 item.credentialUrl,
@@ -285,7 +286,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
               <View key={`publication-${index}`}>
                 <View style={styles.row}>
                   <Text style={styles.itemTitle}>{item.title}</Text>
-                  <Text style={styles.rowMeta}>{formatSingleDate(item.date)}</Text>
+                  <Text style={styles.rowMeta}>{singleDate(item.date)}</Text>
                 </View>
                 {item.venue ? <Text>{item.venue}</Text> : null}
                 {item.url ? <Link src={item.url}>{item.url}</Link> : null}

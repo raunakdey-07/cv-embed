@@ -31,6 +31,7 @@ export function CompactTemplate({ resume, primaryColor, densityMode = 'compact' 
   const sectionClassName = `resume-template template-compact density-${densityMode} heading-${options.sectionHeadingStyle} font-${options.fontFamily} text-${options.fontSize} line-${options.lineHeight}`
 
   const linkText = (label: string, url: string) => (options.linkDisplay === 'url' ? url : label || url)
+  const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)
 
   const shouldRender = (sectionId: ResumeSectionKey, hasContentForSection: boolean) => {
     return options.showSections[sectionId] && hasContentForSection
@@ -127,7 +128,7 @@ export function CompactTemplate({ resume, primaryColor, densityMode = 'compact' 
             <ul>
               {resume.certifications.filter(hasCertificationItem).map((item, index) => (
                 <li key={index}>
-                  {bulletPrefix} {item.title} - {item.issuer}{formatSingleDate(item.date) ? ` (${formatSingleDate(item.date)})` : ''}
+                  {bulletPrefix} {item.title} - {item.issuer}{singleDate(item.date) ? ` (${singleDate(item.date)})` : ''}
                   {item.credentialId ? ` • ID: ${item.credentialId}` : ''}
                   {item.credentialUrl ? ` • ${item.credentialUrl}` : ''}
                 </li>
@@ -203,7 +204,7 @@ export function CompactTemplate({ resume, primaryColor, densityMode = 'compact' 
               <div key={index} className="resume-item">
                 <div className="resume-row">
                   <strong>{item.title || 'Publication'}</strong>
-                  <div className="resume-row-meta">{formatSingleDate(item.date)}</div>
+                  <div className="resume-row-meta">{singleDate(item.date)}</div>
                 </div>
                 <p>{item.venue}</p>
                 {item.url ? (

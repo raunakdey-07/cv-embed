@@ -18,6 +18,7 @@ import {
   IconSliders, IconTrophy, IconUpload, IconUser, IconZap,
 } from '../../components/ui/Icons'
 import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
+import { DEFAULT_SECTION_ORDER } from '../../types/resume'
 import { loadDraft, saveDraft } from '../../lib/storage'
 import { resolveNextActionSection } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
@@ -66,7 +67,7 @@ function buildEmbedArtifacts(baseUrl: string, resume: Resume, options: EmbedBuil
   const portableUrl = portable.toString()
   const sdkUrl = `${origin}/sdk.js?v=2`
   const iframeSnippet = `<iframe src="${portableUrl}" width="100%" height="${options.iframeHeight}" frameborder="0" loading="lazy" title="Resume"></iframe>`
-  const sdkSnippet = `<script src="${sdkUrl}"></script>\n<div id="resume-container"></div>\n<script>\n  const embed = CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${JSON.stringify(resume, null, 2)},\n    height: ${options.iframeHeight},\n    theme: { density: 'compact', fontScale: 1, radius: 8 },\n    options: {\n      showDownload: ${options.showDownload ? 'true' : 'false'},\n      autoHeight: true,\n      mode: 'guided',\n      eventTargetOrigin: window.location.origin\n    },\n    events: {\n      onReady: (payload) => console.log('cv-embed ready', payload),\n      onValidationChange: (payload) => console.log('cv-embed validation', payload),\n      onHeightChange: ({ height }) => console.log('cv-embed height', height)\n    }\n  });\n</script>`
+  const sdkSnippet = `<script src="${sdkUrl}"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeId: 'portable', // or pass resumeData with your resume JSON\n    height: ${options.iframeHeight},\n    options: {\n      showDownload: ${options.showDownload ? 'true' : 'false'},\n      autoHeight: true\n    },\n    events: {\n      onReady: () => console.log('resume loaded'),\n      onHeightChange: ({ height }) => console.log('resized to', height)\n    }\n  });\n</script>`
   const reactSnippet = `<iframe src="${portableUrl}" style={{ width: '100%', height: '${options.iframeHeight}px', border: 0 }} loading="lazy" title="Resume" />`
   const integrationPack = [
     'CV-Embed Integration Pack v2',
@@ -78,13 +79,6 @@ function buildEmbedArtifacts(baseUrl: string, resume: Resume, options: EmbedBuil
     `React iframe:\n${reactSnippet}`,
     '',
     `SDK:\n${sdkSnippet}`,
-    '',
-    'Event API emitted by iframe:',
-    '- ready',
-    '- heightChange',
-    '- validationChange',
-    '- sectionFocus',
-    '- export',
   ].join('\n')
   return { portableUrl, iframeSnippet, sdkSnippet, reactSnippet, integrationPack }
 }
@@ -241,6 +235,7 @@ export function BuilderPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [openPopover, setOpenPopover] = useState<'info' | 'fixNext' | 'clean' | 'score' | null>(null)
   const [organizeOpen, setOrganizeOpen] = useState(false)
+  const [formatOpen, setFormatOpen] = useState(false)
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
   const scoreZoneRef = useRef<HTMLDivElement>(null)
   const [estimatedPages, setEstimatedPages] = useState(1)
@@ -249,7 +244,7 @@ export function BuilderPage() {
   const [lastEstimateDurationMs, setLastEstimateDurationMs] = useState<number | null>(null)
   const [lastEstimateSource, setLastEstimateSource] = useState<'blank' | 'cache' | 'idle' | 'urgent' | null>(null)
   const [lastEstimateUpdatedAt, setLastEstimateUpdatedAt] = useState<number | null>(null)
-  const [embedBaseUrl, setEmbedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
+  const [embedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
   const [embedPreset, setEmbedPreset] = useState<EmbedPreset>('placement')
   const [embedIframeHeight, setEmbedIframeHeight] = useState(1100)
   const [embedShowDownload, setEmbedShowDownload] = useState(false)
@@ -666,30 +661,30 @@ export function BuilderPage() {
   const embedSnippetCards = embedArtifacts ? [
     {
       key: 'iframe',
-      label: 'iframe',
-      title: 'Portable iframe',
-      description: 'Drop-in embed for portals and static sites.',
+      label: 'HTML',
+      title: 'Website / portal',
+      description: 'Paste into any page, CMS block, or portal rich-text field that allows HTML.',
       value: embedArtifacts.iframeSnippet,
     },
     {
       key: 'react',
-      label: 'react',
-      title: 'React iframe',
-      description: 'JSX-friendly embed for React applications.',
+      label: 'React',
+      title: 'React app',
+      description: 'Drop-in JSX component for React projects.',
       value: embedArtifacts.reactSnippet,
     },
     {
       key: 'sdk',
-      label: 'sdk',
-      title: 'SDK bridge',
-      description: 'Script block with bridge events and callbacks.',
+      label: 'SDK',
+      title: 'Advanced (auto-height + events)',
+      description: 'Script integration with resize and event callbacks.',
       value: embedArtifacts.sdkSnippet,
     },
     {
       key: 'pack',
-      label: 'pack',
-      title: 'Integration pack',
-      description: 'A single copy block with all host-facing artifacts.',
+      label: 'All',
+      title: 'Everything in one copy',
+      description: 'Link plus all snippets — handy to save or share with a developer.',
       value: embedArtifacts.integrationPack,
     },
   ] : []
@@ -754,6 +749,29 @@ export function BuilderPage() {
   // Only render editor panels for sections enabled in the resume; hidden
   // sections drop out of the nav too so the editing flow matches the output.
   const visibleNavSections = navSections.filter((s) => !s.hidden)
+
+  // Form panels follow sectionOrder so editing order matches nav/preview/export.
+  const orderedFormSections = useMemo(() => {
+    const options = resume.meta.documentOptions
+    const order = options.sectionOrder.length > 0 ? options.sectionOrder : DEFAULT_SECTION_ORDER
+
+    const nodes: Partial<Record<ResumeSectionKey, React.ReactNode>> = {
+      education: <EducationSection education={resume.education} onChange={(education) => setResume((p) => ({ ...p, education }))} />,
+      experience: <ExperienceSection experience={resume.experience} onChange={(experience) => setResume((p) => ({ ...p, experience }))} />,
+      projects: <ProjectsSection projects={resume.projects} onChange={(projects) => setResume((p) => ({ ...p, projects }))} />,
+      skills: <SkillsSection skills={resume.skills} onChange={(skills) => setResume((p) => ({ ...p, skills }))} />,
+      certifications: <CertificationsSection certifications={resume.certifications} onChange={(certifications) => setResume((p) => ({ ...p, certifications }))} />,
+      accomplishments: <AccomplishmentsSection accomplishments={resume.accomplishments} onChange={(accomplishments) => setResume((p) => ({ ...p, accomplishments }))} />,
+      activities: <ActivitiesSection activities={resume.activities} onChange={(activities) => setResume((p) => ({ ...p, activities }))} />,
+      volunteering: <VolunteeringSection volunteering={resume.volunteering} onChange={(volunteering) => setResume((p) => ({ ...p, volunteering }))} />,
+      publications: <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />,
+      summary: null,
+    }
+
+    return order
+      .filter((key) => options.showSections[key] && nodes[key])
+      .map((key) => ({ key, node: nodes[key] as React.ReactNode }))
+  }, [resume])
 
   const jumpToFirstIssue = useCallback(() => {
     const section = nextActionSection
@@ -910,28 +928,20 @@ export function BuilderPage() {
 
         {embedArtifacts ? (
           <div className="embed-strip">
-            <div className="embed-field-row">
-              <span className="embed-label">Public Base URL</span>
-              <input
-                className="embed-base-input"
-                value={embedBaseUrl}
-                onChange={(event) => setEmbedBaseUrl(event.target.value)}
-                onBlur={() => setEmbedBaseUrl((current) => normalizeBaseUrl(current) || getDefaultEmbedBaseUrl())}
-                placeholder="https://cv-embed.vercel.app"
-              />
-            </div>
+            <p className="embed-tip embed-tip-lead">
+              Your resume is ready to embed. Pick where you're adding it and copy the matching snippet.
+            </p>
             <div className="embed-config-row">
               <label className="embed-config-item embed-config-pill">
-                <span className="embed-label">Preset</span>
+                <span className="embed-label">Where?</span>
                 <select
                   className="embed-preset-select"
                   value={embedPreset}
                   onChange={(event) => onEmbedPresetChange(event.target.value as EmbedPreset)}
                 >
-                  <option value="placement">Placement Portal</option>
-                  <option value="portfolio">Portfolio</option>
-                  <option value="showcase">Compact Showcase</option>
-                  <option value="custom">Custom</option>
+                  <option value="placement">Job portal / ATS</option>
+                  <option value="portfolio">Personal site / portfolio</option>
+                  <option value="showcase">Compact widget</option>
                 </select>
               </label>
               <label className="embed-config-item embed-config-pill">
@@ -951,7 +961,7 @@ export function BuilderPage() {
                 />
               </label>
               <label className="embed-config-item embed-config-pill embed-toggle-item">
-                <span className="embed-label">Download</span>
+                <span className="embed-label">Download button</span>
                 <input
                   type="checkbox"
                   checked={embedShowDownload}
@@ -960,15 +970,14 @@ export function BuilderPage() {
                 <span className="embed-toggle-text">{embedShowDownload ? 'Shown' : 'Hidden'}</span>
               </label>
             </div>
-            <p className="embed-tip">Use iframe for portals, React for apps, and the SDK for host-controlled bridges.</p>
             <div className="embed-link-card">
               <div className="embed-link-card-head">
-                <span className="embed-label">Embed URL</span>
+                <span className="embed-label">Shareable link</span>
                 <div className="embed-link-actions">
-                  <a href={embedArtifacts.portableUrl} target="_blank" rel="noreferrer" className="embed-icon-btn" aria-label="Open embed URL">
+                  <a href={embedArtifacts.portableUrl} target="_blank" rel="noreferrer" className="embed-icon-btn" aria-label="Open embed URL" title="Open in new tab">
                     <IconExternalLink size={11} />
                   </a>
-                  <button type="button" className="embed-icon-btn" onClick={() => copyTo('Embed URL', embedArtifacts.portableUrl)} aria-label="Copy embed URL">
+                  <button type="button" className="embed-icon-btn" onClick={() => copyTo('Embed URL', embedArtifacts.portableUrl)} aria-label="Copy embed URL" title="Copy link">
                     <IconCopy size={11} />
                   </button>
                 </div>
@@ -986,7 +995,7 @@ export function BuilderPage() {
                         <p className="embed-snippet-description">{card.description}</p>
                       </div>
                     </div>
-                    <button type="button" className="embed-icon-btn" onClick={() => copyTo(card.title, card.value)} aria-label={`Copy ${card.label} snippet`}>
+                    <button type="button" className="embed-icon-btn" onClick={() => copyTo(card.title, card.value)} aria-label={`Copy ${card.label} snippet`} title="Copy code">
                       <IconCopy size={11} />
                     </button>
                   </div>
@@ -994,6 +1003,16 @@ export function BuilderPage() {
                 </div>
               ))}
             </div>
+            <details className="embed-preview-details">
+              <summary>Preview how it looks embedded</summary>
+              <iframe
+                src={embedArtifacts.portableUrl}
+                title="Embed preview"
+                className="embed-preview-frame"
+                style={{ height: Math.min(embedIframeHeight, 640) }}
+                loading="lazy"
+              />
+            </details>
             {copyState ? <span className="copy-toast"><IconCheck size={11} /> {copyState}</span> : null}
           </div>
         ) : null}
@@ -1006,11 +1025,21 @@ export function BuilderPage() {
           onToggleSection={toggleSectionVisibility}
           onMoveSection={moveSectionOrder}
           onSelect={(id) => scrollTo(id as SectionId)}
-          onOrganizeToggle={() => setOrganizeOpen((o) => !o)}
+          onOrganizeToggle={() => { setOrganizeOpen((o) => !o); setFormatOpen(false) }}
           onOrganizeClose={() => setOrganizeOpen(false)}
+          formatSheet={
+            <DocumentOptionsSection
+              options={resume.meta.documentOptions}
+              onChange={(documentOptions) => setResume((p) => ({ ...p, meta: { ...p.meta, documentOptions } }))}
+            />
+          }
+          formatOpen={formatOpen}
+          onFormatToggle={() => { setFormatOpen((f) => !f); setOrganizeOpen(false) }}
+          onFormatClose={() => setFormatOpen(false)}
         />
 
-        <div id="section-basics" className={sectionCls('basics')} onMouseDownCapture={() => setActiveSection('basics')} onFocusCapture={() => setActiveSection('basics')}>
+        <div id="section-basics" className={sectionCls('basics')} onMouseDownCapture={() => setActiveSection('basics')} onFocusCapture={() => setActiveSection('basics')}
+>
           <BasicsSection
             basics={resume.basics}
             linkDisplay={resume.meta.documentOptions.linkDisplay}
@@ -1029,59 +1058,17 @@ export function BuilderPage() {
             onChange={(basics) => setResume((p) => ({ ...p, basics }))}
           />
         </div>
-        <div id="section-document-options" className={sectionCls('document-options')} onMouseDownCapture={() => setActiveSection('document-options')} onFocusCapture={() => setActiveSection('document-options')}>
-          <DocumentOptionsSection
-            options={resume.meta.documentOptions}
-            onChange={(documentOptions) => setResume((p) => ({ ...p, meta: { ...p.meta, documentOptions } }))}
-            onToggleSection={toggleSectionVisibility}
-            onMoveSection={moveSectionOrder}
-          />
-        </div>
-        {resume.meta.documentOptions.showSections.education ? (
-        <div id="section-education" className={sectionCls('education')} onMouseDownCapture={() => setActiveSection('education')} onFocusCapture={() => setActiveSection('education')}>
-          <EducationSection education={resume.education} onChange={(education) => setResume((p) => ({ ...p, education }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.experience ? (
-        <div id="section-experience" className={sectionCls('experience')} onMouseDownCapture={() => setActiveSection('experience')} onFocusCapture={() => setActiveSection('experience')}>
-          <ExperienceSection experience={resume.experience} onChange={(experience) => setResume((p) => ({ ...p, experience }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.projects ? (
-        <div id="section-projects" className={sectionCls('projects')} onMouseDownCapture={() => setActiveSection('projects')} onFocusCapture={() => setActiveSection('projects')}>
-          <ProjectsSection projects={resume.projects} onChange={(projects) => setResume((p) => ({ ...p, projects }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.skills ? (
-        <div id="section-skills" className={sectionCls('skills')} onMouseDownCapture={() => setActiveSection('skills')} onFocusCapture={() => setActiveSection('skills')}>
-          <SkillsSection skills={resume.skills} onChange={(skills) => setResume((p) => ({ ...p, skills }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.certifications ? (
-        <div id="section-certifications" className={sectionCls('certifications')} onMouseDownCapture={() => setActiveSection('certifications')} onFocusCapture={() => setActiveSection('certifications')}>
-          <CertificationsSection certifications={resume.certifications} onChange={(certifications) => setResume((p) => ({ ...p, certifications }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.accomplishments ? (
-        <div id="section-accomplishments" className={sectionCls('accomplishments')} onMouseDownCapture={() => setActiveSection('accomplishments')} onFocusCapture={() => setActiveSection('accomplishments')}>
-          <AccomplishmentsSection accomplishments={resume.accomplishments} onChange={(accomplishments) => setResume((p) => ({ ...p, accomplishments }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.activities ? (
-        <div id="section-activities" className={sectionCls('activities')} onMouseDownCapture={() => setActiveSection('activities')} onFocusCapture={() => setActiveSection('activities')}>
-          <ActivitiesSection activities={resume.activities} onChange={(activities) => setResume((p) => ({ ...p, activities }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.volunteering ? (
-        <div id="section-volunteering" className={sectionCls('volunteering')} onMouseDownCapture={() => setActiveSection('volunteering')} onFocusCapture={() => setActiveSection('volunteering')}>
-          <VolunteeringSection volunteering={resume.volunteering} onChange={(volunteering) => setResume((p) => ({ ...p, volunteering }))} />
-        </div>
-        ) : null}
-        {resume.meta.documentOptions.showSections.publications ? (
-        <div id="section-publications" className={sectionCls('publications')} onMouseDownCapture={() => setActiveSection('publications')} onFocusCapture={() => setActiveSection('publications')}>
-          <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />
-        </div>
-        ) : null}
+        {orderedFormSections.map(({ key, node }) => (
+          <div
+            key={key}
+            id={`section-${key}`}
+            className={sectionCls(key as SectionId)}
+            onMouseDownCapture={() => setActiveSection(key as SectionId)}
+            onFocusCapture={() => setActiveSection(key as SectionId)}
+          >
+            {node}
+          </div>
+        ))}
       </section>
       ) : null}
 

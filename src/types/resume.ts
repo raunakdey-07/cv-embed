@@ -39,7 +39,7 @@ export interface DocumentOptions {
   lineHeight: 'tight' | 'normal' | 'relaxed'
   sectionHeadingStyle: 'rule' | 'bold' | 'minimal'
   bulletStyle: 'dot' | 'dash'
-  dateStyle: 'range' | 'compact'
+  dateStyle: 'range' | 'compact' | 'short' | 'numeric' | 'iso'
   density: 'comfortable' | 'compact' | 'relaxed'
   linkDisplay: 'label' | 'url'
   showSections: Record<ResumeSectionKey, boolean>

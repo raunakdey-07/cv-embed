@@ -104,7 +104,7 @@ const documentOptionsSchema = z.object({
   lineHeight: z.enum(['tight', 'normal', 'relaxed']),
   sectionHeadingStyle: z.enum(['rule', 'bold', 'minimal']),
   bulletStyle: z.enum(['dot', 'dash']),
-  dateStyle: z.enum(['range', 'compact']),
+  dateStyle: z.enum(['range', 'compact', 'short', 'numeric', 'iso']),
   density: z.enum(['comfortable', 'compact', 'relaxed']),
   linkDisplay: z.enum(['label', 'url']),
   showSections: z.object({

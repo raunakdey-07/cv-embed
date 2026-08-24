@@ -155,6 +155,7 @@ function bulletParagraph(text: string, resume: Resume): Paragraph {
 function renderSections(resume: Resume): Paragraph[] {
   const options = resume.meta.documentOptions
   const dateValue = (startDate: string, endDate: string) => formatDateRangeByStyle(startDate, endDate, options.dateStyle)
+  const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)
   const sectionOrder = [...new Set([...(options.sectionOrder ?? []), ...DEFAULT_SECTION_ORDER])]
 
   const shouldRender = (sectionId: ResumeSectionKey, hasContentForSection: boolean) => {
@@ -218,7 +219,7 @@ function renderSections(resume: Resume): Paragraph[] {
     if (sectionId === 'certifications' && shouldRender('certifications', hasContent(resume.certifications))) {
       paragraphs.push(sectionTitleParagraph('Certifications', resume))
       for (const item of resume.certifications.filter(hasCertificationItem)) {
-        const date = formatSingleDate(item.date)
+        const date = singleDate(item.date)
         const details = [
           item.credentialId ? `ID: ${item.credentialId}` : '',
           item.credentialUrl,
@@ -269,7 +270,7 @@ function renderSections(resume: Resume): Paragraph[] {
     if (sectionId === 'publications' && shouldRender('publications', hasContent(resume.publications))) {
       paragraphs.push(sectionTitleParagraph('Publications', resume))
       for (const item of resume.publications.filter(hasPublicationItem)) {
-        paragraphs.push(rowParagraph(item.title, formatSingleDate(item.date), resume))
+        paragraphs.push(rowParagraph(item.title, singleDate(item.date), resume))
         if (item.venue) paragraphs.push(bodyParagraph(item.venue, resume))
         if (item.url) paragraphs.push(linkParagraph('', item.url, item.url, resume))
       }

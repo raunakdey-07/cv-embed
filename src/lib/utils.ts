@@ -16,7 +16,9 @@ export function createResumeId(): string {
   return `${seed[0].toString(36)}${seed[1].toString(36)}`.slice(0, 12)
 }
 
-function formatDateToken(value: string): string {
+export type DateStyle = 'range' | 'compact' | 'short' | 'numeric' | 'iso'
+
+function formatDateToken(value: string, style: DateStyle = 'range'): string {
   const raw = value.trim()
   if (!raw) {
     return ''
@@ -27,8 +29,7 @@ function formatDateToken(value: string): string {
     const [, year, month] = monthMatch
     const monthIndex = Number(month) - 1
     if (monthIndex >= 0 && monthIndex <= 11) {
-      const date = new Date(Date.UTC(Number(year), monthIndex, 1))
-      return date.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+      return formatMonthYear(Number(year), monthIndex, style)
     }
   }
 
@@ -37,21 +38,41 @@ function formatDateToken(value: string): string {
     const [, year, month] = dayMatch
     const monthIndex = Number(month) - 1
     if (monthIndex >= 0 && monthIndex <= 11) {
-      const date = new Date(Date.UTC(Number(year), monthIndex, 1))
-      return date.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+      return formatMonthYear(Number(year), monthIndex, style)
     }
   }
 
   return raw
 }
 
-export function formatSingleDate(value: string): string {
-  return formatDateToken(value)
+function formatMonthYear(year: number, monthIndex: number, style: DateStyle): string {
+  const date = new Date(Date.UTC(year, monthIndex, 1))
+  switch (style) {
+    case 'short':
+      return `${date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })} ${year}`
+    case 'numeric':
+      return `${String(monthIndex + 1).padStart(2, '0')}/${year}`
+    case 'iso':
+      return `${year}-${String(monthIndex + 1).padStart(2, '0')}`
+    default:
+      return date.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+  }
 }
 
-export function formatDateRange(startDate: string, endDate: string): string {
-  const start = formatDateToken(startDate)
-  const end = formatDateToken(endDate)
+export function formatSingleDate(value: string, style: DateStyle = 'range'): string {
+  return formatDateToken(value, style)
+}
+
+export function formatDateRangeByStyle(
+  startDate: string,
+  endDate: string,
+  style: DateStyle,
+): string {
+  const start = formatDateToken(startDate, style)
+  const end = formatDateToken(endDate, style)
+
+  // ISO and numeric styles read fine with an en dash; others keep " - ".
+  const separator = style === 'compact' || style === 'numeric' || style === 'iso' ? '–' : ' - '
 
   if (!start && !end) {
     return ''
@@ -62,33 +83,10 @@ export function formatDateRange(startDate: string, endDate: string): string {
   }
 
   if (start && !end) {
-    return `${start} - Present`
+    return `${start}${separator}Present`
   }
 
-  return `${start} - ${end}`
-}
-
-export function formatDateRangeByStyle(
-  startDate: string,
-  endDate: string,
-  style: 'range' | 'compact',
-): string {
-  const start = formatDateToken(startDate)
-  const end = formatDateToken(endDate)
-
-  if (style === 'compact') {
-    if (!start && !end) {
-      return ''
-    }
-
-    if (!start && end) {
-      return end
-    }
-
-    return [start, end || 'Present'].filter(Boolean).join('–')
-  }
-
-  return formatDateRange(start, end)
+  return `${start}${separator}${end}`
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {

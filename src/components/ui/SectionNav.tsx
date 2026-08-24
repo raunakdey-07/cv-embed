@@ -19,6 +19,11 @@ interface SectionNavProps {
   onSelect: (id: string) => void
   onOrganizeToggle: () => void
   onOrganizeClose: () => void
+  /** Rendered inside the Format tab's dropdown sheet. */
+  formatSheet: React.ReactNode
+  formatOpen: boolean
+  onFormatToggle: () => void
+  onFormatClose: () => void
 }
 
 const ORDER_LABELS: Record<keyof DocumentOptions['showSections'], string> = {
@@ -44,20 +49,28 @@ export function SectionNav({
   onSelect,
   onOrganizeToggle,
   onOrganizeClose,
+  formatSheet,
+  formatOpen,
+  onFormatToggle,
+  onFormatClose,
 }: SectionNavProps) {
   const rootRef = useRef<HTMLElement>(null)
 
-  // Close the organize sheet on outside click or Escape.
+  // Close open sheets on outside click or Escape.
   useEffect(() => {
-    if (!organizeOpen) return
+    if (!organizeOpen && !formatOpen) return
 
     const onMouseDown = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        onOrganizeClose()
+        if (organizeOpen) onOrganizeClose()
+        if (formatOpen) onFormatClose()
       }
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onOrganizeClose()
+      if (e.key === 'Escape') {
+        if (organizeOpen) onOrganizeClose()
+        if (formatOpen) onFormatClose()
+      }
     }
 
     document.addEventListener('mousedown', onMouseDown)
@@ -66,22 +79,39 @@ export function SectionNav({
       document.removeEventListener('mousedown', onMouseDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [onOrganizeClose, organizeOpen])
+  }, [formatOpen, onFormatClose, onOrganizeClose, organizeOpen])
 
   const orderedSections = sectionOrder.length > 0 ? sectionOrder : []
+
+  const handleSelect = (id: string) => {
+    if (id === 'document-options') {
+      // Format is a dropdown, not a scroll target.
+      onFormatToggle()
+      return
+    }
+    onSelect(id)
+  }
 
   return (
     <nav className="section-nav" ref={rootRef}>
       <div className="section-nav-tabs">
         {sections.map((s) => (
-          <button
-            key={s.id}
-            className={`nav-tab ${s.active ? 'active' : ''} ${s.hidden ? 'is-hidden-section' : ''}`}
-            onClick={() => onSelect(s.id)}
-            title={s.hidden ? `${s.label} (hidden from resume)` : s.label}
-          >
-            <span>{s.label}</span>
-          </button>
+          <div key={s.id} className="nav-tab-wrap">
+            <button
+              className={`nav-tab ${s.active && s.id !== 'document-options' ? 'active' : ''} ${s.id === 'document-options' && formatOpen ? 'active' : ''} ${s.hidden ? 'is-hidden-section' : ''}`}
+              onClick={() => handleSelect(s.id)}
+              aria-expanded={s.id === 'document-options' ? formatOpen : undefined}
+              title={s.hidden ? `${s.label} (hidden from resume)` : s.label}
+            >
+              <span>{s.label}</span>
+              {s.id === 'document-options' ? <IconChevronDown size={9} /> : null}
+            </button>
+            {s.id === 'document-options' && formatOpen ? (
+              <div className="nav-sheet" role="dialog" aria-label="Formatting">
+                {formatSheet}
+              </div>
+            ) : null}
+          </div>
         ))}
       </div>
       <div className="organize-wrap">
