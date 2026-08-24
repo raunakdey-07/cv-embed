@@ -74,7 +74,7 @@ test.describe('Builder QoL flows', () => {
     await page.goto('/builder')
     await expect(page.getByText('Resume Readiness')).toBeVisible()
 
-    const organizeBtn = page.locator('.organize-btn')
+    const organizeBtn = page.locator('.organize-sections-btn')
     await expect(organizeBtn).toBeVisible()
 
     // Touch targets should be at least 40px tall.
@@ -88,17 +88,17 @@ test.describe('Builder QoL flows', () => {
 
     // Basic defaults: optional sections start disabled.
     await expect(page.locator('#section-certifications')).toHaveCount(0)
-    await expect(page.locator('.nav-tab', { hasText: 'Certs' })).toHaveCount(0)
+    await expect(page.locator('.nav-tab', { hasText: 'Certifications' })).toHaveCount(0)
 
     // Enabling a section adds its editor panel and nav tab immediately.
     await sheet.locator('.order-item', { hasText: 'Certifications' }).locator('input[type="checkbox"]').check()
     await expect(page.locator('#section-certifications')).toBeVisible()
-    await expect(page.locator('.nav-tab', { hasText: 'Certs' })).toBeVisible()
+    await expect(page.locator('.nav-tab', { hasText: 'Certifications' })).toBeVisible()
 
     // Disabling removes both again.
     await sheet.locator('.order-item', { hasText: 'Certifications' }).locator('input[type="checkbox"]').uncheck()
     await expect(page.locator('#section-certifications')).toHaveCount(0)
-    await expect(page.locator('.nav-tab', { hasText: 'Certs' })).toHaveCount(0)
+    await expect(page.locator('.nav-tab', { hasText: 'Certifications' })).toHaveCount(0)
 
     // Core sections behave the same way (Education is on by default).
     const educationToggle = sheet.locator('.order-item', { hasText: 'Education' }).locator('input[type="checkbox"]')

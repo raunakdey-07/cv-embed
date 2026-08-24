@@ -9,11 +9,11 @@ test('format sheet opens from nav Format tab', async ({ page, isMobile }) => {
   // No format panel in the form anymore.
   await expect(page.locator('#section-document-options')).toHaveCount(0)
 
-  const formatTab = page.locator('.nav-tab', { hasText: 'Format' })
-  await expect(formatTab).toBeVisible()
-  await formatTab.click()
+  const formatBtn = page.locator('.format-btn')
+  await expect(formatBtn).toBeVisible()
+  await formatBtn.click()
 
-  const sheet = page.locator('.nav-sheet')
+  const sheet = page.locator('.format-sheet')
   await expect(sheet).toBeVisible()
   await expect(sheet.getByText('Accent Color')).toBeVisible()
   await expect(sheet.getByText('Dates')).toBeVisible()

@@ -76,8 +76,31 @@ button {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 14px;
+}
+
+.header-embed-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.header-embed-btn:hover {
+  color: var(--text);
+  border-color: var(--accent-mid);
+  background: var(--accent-dim);
 }
 
 .brand-kicker { display: none; }
@@ -979,26 +1002,6 @@ button.score-pill {
   display: inline-flex;
 }
 
-.nav-sheet {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: min(340px, calc(100vw - 28px));
-  max-height: min(480px, calc(100vh - 140px));
-  overflow-y: auto;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 12px;
-  z-index: 50;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
-}
-
-/* Compact form controls inside the nav dropdown */
-.nav-sheet .field-grid {
-  grid-template-columns: 1fr;
-}
-
 .organize-wrap {
   position: relative;
   flex-shrink: 0;
@@ -1043,6 +1046,16 @@ button.score-pill {
   letter-spacing: 0.05em;
   color: var(--text-2);
   margin-bottom: 8px;
+}
+
+.format-sheet {
+  width: min(320px, calc(100vw - 28px));
+}
+
+/* Compact single-column form controls inside the format sheet */
+.format-sheet .field-grid {
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 /* ═══════════════════════ Section Shell (focus mode) ═══════════════════════ */

@@ -14,7 +14,7 @@ import { TemplateRenderer } from '../../components/templates/TemplateRenderer'
 import {
   IconAlertTriangle, IconAward, IconBraces, IconBriefcase, IconCheck,
   IconChevronDown, IconCode, IconCopy, IconDownload, IconExternalLink,
-  IconEye, IconFileText, IconFlag, IconGraduationCap, IconLink,
+  IconEye, IconFileText, IconFlag, IconGraduationCap,
   IconSliders, IconTrophy, IconUpload, IconUser, IconZap,
 } from '../../components/ui/Icons'
 import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
@@ -95,7 +95,7 @@ const SECTION_NAV: { id: SectionId; Icon: (p: { size?: number }) => React.ReactN
   { id: 'experience', Icon: IconBriefcase, label: 'Experience' },
   { id: 'projects', Icon: IconCode, label: 'Projects' },
   { id: 'skills', Icon: IconZap, label: 'Skills' },
-  { id: 'certifications', Icon: IconAward, label: 'Certs' },
+  { id: 'certifications', Icon: IconAward, label: 'Certifications' },
   { id: 'accomplishments', Icon: IconTrophy, label: 'Awards' },
   { id: 'activities', Icon: IconFlag, label: 'Activities' },
   { id: 'volunteering', Icon: IconFlag, label: 'Volunteer' },
@@ -597,6 +597,13 @@ export function BuilderPage() {
     }))
   }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
 
+  // Header "Embed" button toggles the panel (App dispatches this event).
+  useEffect(() => {
+    const handler = () => createEmbedLink()
+    window.addEventListener('cvembed:toggle-embed', handler)
+    return () => window.removeEventListener('cvembed:toggle-embed', handler)
+  }, [createEmbedLink])
+
   const onEmbedPresetChange = (preset: EmbedPreset) => {
     setEmbedPreset(preset)
     if (preset === 'custom') return
@@ -1090,14 +1097,6 @@ export function BuilderPage() {
           </div>
           <div className="preview-head-actions">
             <div className="toolbar-strip toolbar-strip-right">
-              <button
-                type="button"
-                className="tool-btn"
-                title={embedArtifacts ? 'Hide embed panel' : 'Show embed panel'}
-                onClick={createEmbedLink}
-              >
-                <IconLink size={14} />
-              </button>
               <button type="button" className="tool-btn" title="Import resume JSON" onClick={() => fileRef.current?.click()}><IconUpload size={14} /></button>
               <div className="export-menu" ref={exportRef}>
                 <button type="button" className="tool-btn" title="Export resume" onClick={() => setExportOpen((o) => !o)} disabled={busy}>

@@ -6,8 +6,8 @@ test('embed panel: opens, shows friendly snippets, live preview works', async ({
   await page.goto('/builder')
   await expect(page.getByText('Resume Readiness')).toBeVisible()
 
-  // Open the embed panel via the link tool button.
-  await page.locator('.tool-btn[title="Show embed panel"]').click()
+  // Open the embed panel via the header Embed button.
+  await page.locator('.header-embed-btn').click()
   const strip = page.locator('.embed-strip')
   await expect(strip).toBeVisible()
 

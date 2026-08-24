@@ -38,7 +38,7 @@ test('order + visibility drive form, nav, and preview together', async ({ page, 
   expect(previewHeadings.indexOf('Education')).toBeLessThan(previewHeadings.indexOf('Experience'))
 
   // Move Experience up in the organize sheet.
-  await page.locator('.organize-btn').click()
+  await page.locator('.organize-sections-btn').click()
   const sheet = page.locator('.organize-sheet')
   await sheet.locator('.order-item', { hasText: 'Experience' }).locator('[title="Move up"]').click()
 

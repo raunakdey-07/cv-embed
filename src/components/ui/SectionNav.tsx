@@ -83,45 +83,46 @@ export function SectionNav({
 
   const orderedSections = sectionOrder.length > 0 ? sectionOrder : []
 
-  const handleSelect = (id: string) => {
-    if (id === 'document-options') {
-      // Format is a dropdown, not a scroll target.
-      onFormatToggle()
-      return
-    }
-    onSelect(id)
-  }
-
   return (
     <nav className="section-nav" ref={rootRef}>
       <div className="section-nav-tabs">
-        {sections.map((s) => (
-          <div key={s.id} className="nav-tab-wrap">
-            <button
-              className={`nav-tab ${s.active && s.id !== 'document-options' ? 'active' : ''} ${s.id === 'document-options' && formatOpen ? 'active' : ''} ${s.hidden ? 'is-hidden-section' : ''}`}
-              onClick={() => handleSelect(s.id)}
-              aria-expanded={s.id === 'document-options' ? formatOpen : undefined}
-              title={s.hidden ? `${s.label} (hidden from resume)` : s.label}
-            >
-              <span>{s.label}</span>
-              {s.id === 'document-options' ? <IconChevronDown size={9} /> : null}
-            </button>
-            {s.id === 'document-options' && formatOpen ? (
-              <div className="nav-sheet" role="dialog" aria-label="Formatting">
-                {formatSheet}
-              </div>
-            ) : null}
-          </div>
+        {sections.filter((s) => s.id !== 'document-options').map((s) => (
+          <button
+            key={s.id}
+            className={`nav-tab ${s.active ? 'active' : ''}`}
+            onClick={() => onSelect(s.id)}
+            title={s.label}
+          >
+            <span>{s.label}</span>
+          </button>
         ))}
       </div>
       <div className="organize-wrap">
         <button
           type="button"
-          className={`organize-btn ${organizeOpen ? 'active' : ''}`}
+          className={`organize-btn format-btn ${formatOpen ? 'active' : ''}`}
+          title="Formatting"
+          aria-label="Formatting"
+          aria-expanded={formatOpen}
+          onClick={() => { onFormatToggle(); onOrganizeClose() }}
+        >
+          <IconSliders size={13} />
+        </button>
+        {formatOpen ? (
+          <div className="organize-sheet format-sheet" role="dialog" aria-label="Formatting">
+            <p className="organize-sheet-title">Formatting</p>
+            {formatSheet}
+          </div>
+        ) : null}
+      </div>
+      <div className="organize-wrap">
+        <button
+          type="button"
+          className={`organize-btn organize-sections-btn ${organizeOpen ? 'active' : ''}`}
           title="Organize sections"
           aria-label="Organize sections"
           aria-expanded={organizeOpen}
-          onClick={onOrganizeToggle}
+          onClick={() => { onOrganizeToggle(); onFormatClose() }}
         >
           <IconSliders size={13} />
           <IconChevronDown size={9} />
