@@ -20,7 +20,7 @@ import {
 import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
 import { DEFAULT_SECTION_ORDER } from '../../types/resume'
 import { loadDraft, saveDraft } from '../../lib/storage'
-import { resolveNextActionSection } from '../../lib/nextAction'
+import { resolveNextActionSection, type BuilderSectionId } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
 import { createEmptyResume, type DocumentOptions, type Resume, type ResumeSectionKey } from '../../types/resume'
 import { SectionNav, type NavSection } from '../../components/ui/SectionNav'
@@ -84,13 +84,14 @@ function buildEmbedArtifacts(baseUrl: string, resume: Resume, options: EmbedBuil
 }
 
 type SectionId =
-  | 'basics' | 'education' | 'experience' | 'projects'
+  | 'basics' | 'summary' | 'education' | 'experience' | 'projects'
   | 'skills' | 'certifications' | 'accomplishments' | 'activities' | 'volunteering' | 'publications'
   | 'document-options'
 
 const SECTION_NAV: { id: SectionId; Icon: (p: { size?: number }) => React.ReactNode; label: string }[] = [
   { id: 'basics', Icon: IconUser, label: 'Basics' },
   { id: 'document-options', Icon: IconSliders, label: 'Format' },
+  { id: 'summary', Icon: IconFileText, label: 'Summary' },
   { id: 'education', Icon: IconGraduationCap, label: 'Education' },
   { id: 'experience', Icon: IconBriefcase, label: 'Experience' },
   { id: 'projects', Icon: IconCode, label: 'Projects' },
@@ -105,6 +106,7 @@ const SECTION_NAV: { id: SectionId; Icon: (p: { size?: number }) => React.ReactN
 const SECTION_LABELS: Record<SectionId, string> = {
   basics: 'Basics',
   'document-options': 'Format',
+  summary: 'Summary',
   education: 'Education',
   experience: 'Experience',
   projects: 'Projects',
@@ -116,7 +118,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   publications: 'Publications',
 }
 
-function getSectionFromIssue(issue: string): SectionId {
+function getSectionFromIssue(issue: string): BuilderSectionId {
   const value = issue.toLowerCase()
   if (value.includes('basics')) return 'basics'
   if (value.includes('education')) return 'education'
@@ -464,7 +466,7 @@ export function BuilderPage() {
 
   const qualityScoreLabel = `Quality: ${validation.qualityScore}/100`
 
-  const nextIssueSection = useMemo(() => {
+  const nextIssueSection = useMemo((): BuilderSectionId | null => {
     const issue = validation.errors[0] ?? validation.warnings[0]
     return issue ? getSectionFromIssue(issue) : null
   }, [validation.errors, validation.warnings])
@@ -505,7 +507,7 @@ export function BuilderPage() {
       sectionCompletion.accomplishments,
     ]
 
-    const firstMissingEssentialSection: SectionId | null =
+    const firstMissingEssentialSection: BuilderSectionId | null =
       !basicsCoreReady ? 'basics'
         : !sectionCompletion.education ? 'education'
           : !(sectionCompletion.experience || sectionCompletion.projects) ? (resume.meta.documentOptions.showSections.experience ? 'experience' : 'projects')
@@ -534,7 +536,7 @@ export function BuilderPage() {
     }
   }, [resume])
 
-  const nextActionSection = useMemo(() => {
+  const nextActionSection = useMemo((): BuilderSectionId | null => {
     return resolveNextActionSection(completion.firstMissingEssentialSection, nextIssueSection)
   }, [completion.firstMissingEssentialSection, nextIssueSection])
 
@@ -697,6 +699,17 @@ export function BuilderPage() {
   ] : []
 
   const scrollTo = (id: SectionId) => {
+    // Summary lives inside the Basics panel; jump there and focus the field.
+    if (id === 'summary') {
+      setActiveSection('basics')
+      if (isMobileLayout) setMobileView('edit')
+      requestAnimationFrame(() => {
+        document.getElementById('section-basics')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        document.querySelector<HTMLTextAreaElement>('#section-basics textarea')?.focus()
+      })
+      return
+    }
+
     // Hidden sections have no panel to scroll to.
     if (id !== 'document-options' && !resume.meta.documentOptions.showSections[id as ResumeSectionKey]) return
     setActiveSection(id)
@@ -749,8 +762,8 @@ export function BuilderPage() {
   const navSections: NavSection[] = SECTION_NAV.map((s) => ({
     id: s.id,
     label: s.label,
-    active: activeSection === s.id,
-    hidden: s.id !== 'document-options' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
+    active: activeSection === s.id || (s.id === 'summary' && activeSection === 'basics'),
+    hidden: s.id !== 'document-options' && s.id !== 'summary' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
   }))
 
   // Only render editor panels for sections enabled in the resume; hidden
