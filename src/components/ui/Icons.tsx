@@ -113,6 +113,10 @@ export function IconSliders(props: IconProps) {
   return <Svg {...props}><line x1="21" y1="4" x2="14" y2="4" /><line x1="10" y1="4" x2="3" y2="4" /><line x1="21" y1="12" x2="12" y2="12" /><line x1="8" y1="12" x2="3" y2="12" /><line x1="21" y1="20" x2="16" y2="20" /><line x1="12" y1="20" x2="3" y2="20" /><line x1="14" y1="2" x2="14" y2="6" /><line x1="8" y1="10" x2="8" y2="14" /><line x1="16" y1="18" x2="16" y2="22" /></Svg>
 }
 
+export function IconPaintbrush(props: IconProps) {
+  return <Svg {...props}><path d="m14.622 17.896-9.55-9.55c-.44-.439-.44-1.152 0-1.591a6.168 6.168 0 0 1 8.723 0l5.194 5.194a6.168 6.168 0 0 1 0 8.723c-.44.44-1.152.44-1.591 0Z" /><path d="m11.5 6.5 4 4" /><path d="m6.75 11.25 4 4" /><path d="M4.073 13.5H3v5.857A2.643 2.643 0 0 0 5.643 22h5.857v-1.073A2.643 2.643 0 0 0 8.857 18.28 2.643 2.643 0 0 0 6.214 15.64 2.643 2.643 0 0 0 4.073 13.5" /></Svg>
+}
+
 export function IconEye(props: IconProps) {
   return <Svg {...props}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></Svg>
 }

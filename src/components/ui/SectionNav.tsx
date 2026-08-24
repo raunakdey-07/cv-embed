@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { IconChevronDown, IconSliders } from '../ui/Icons'
+import { IconChevronDown, IconPaintbrush, IconSliders } from '../ui/Icons'
 import type { DocumentOptions, ResumeSectionKey } from '../../types/resume'
 
 export interface NavSection {
@@ -106,7 +106,7 @@ export function SectionNav({
           aria-expanded={formatOpen}
           onClick={() => { onFormatToggle(); onOrganizeClose() }}
         >
-          <IconSliders size={13} />
+          <IconPaintbrush size={13} />
         </button>
         {formatOpen ? (
           <div className="organize-sheet format-sheet" role="dialog" aria-label="Formatting">
