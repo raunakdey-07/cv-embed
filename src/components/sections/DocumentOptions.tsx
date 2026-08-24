@@ -1,4 +1,3 @@
-import { IconSliders } from '../ui/Icons'
 import type { DocumentOptions } from '../../types/resume'
 
 interface DocumentOptionsSectionProps {
@@ -12,11 +11,7 @@ export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSec
   }
 
   return (
-    <section className="panel">
-      <div className="section-head">
-        <IconSliders size={16} />
-        <span className="section-title">Formatting</span>
-      </div>
+    <section className="panel format-panel">
       <div className="field-grid">
         <label>Accent Color <input type="color" value={options.accentColor} onChange={(e) => update('accentColor', e.target.value)} /></label>
         <label>Font

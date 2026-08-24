@@ -1058,6 +1058,13 @@ button.score-pill {
   gap: 8px;
 }
 
+/* The embedded options panel drops its own chrome inside the sheet */
+.format-sheet .format-panel {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
 /* ═══════════════════════ Section Shell (focus mode) ═══════════════════════ */
 
 .section-shell {
