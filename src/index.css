@@ -84,7 +84,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 11px;
   border-radius: var(--r);
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -113,10 +113,11 @@ button {
 
 .brand-row h1 {
   font-family: 'Syne', sans-serif;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   color: var(--text);
+  white-space: nowrap;
 }
 
 .brand-pill {
