@@ -107,6 +107,7 @@ const documentOptionsSchema = z.object({
   dateStyle: z.enum(['range', 'compact', 'short', 'numeric', 'iso']),
   density: z.enum(['comfortable', 'compact', 'relaxed']),
   linkDisplay: z.enum(['label', 'url']),
+  headerAlignment: z.enum(['center', 'left']),
   showSections: z.object({
     summary: z.boolean(),
     education: z.boolean(),

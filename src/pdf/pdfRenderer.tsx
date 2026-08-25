@@ -40,6 +40,8 @@ function getPdfStyleConfig(resume: Resume) {
   const fontSize = options.fontSize === 'small' ? 9 : options.fontSize === 'large' ? 11 : 10
   const lineHeight = options.lineHeight === 'tight' ? 1.2 : options.lineHeight === 'relaxed' ? 1.6 : 1.4
 
+  const leftAligned = options.headerAlignment === 'left'
+
   return StyleSheet.create({
     page: {
       padding: compactDensity ? 20 : relaxedDensity ? 28 : 24,
@@ -48,8 +50,8 @@ function getPdfStyleConfig(resume: Resume) {
       fontFamily,
     },
     header: {
-      alignItems: 'center',
-      textAlign: 'center',
+      alignItems: leftAligned ? 'flex-start' : 'center',
+      textAlign: leftAligned ? 'left' : 'center',
     },
     name: {
       fontSize: options.fontSize === 'large' ? (compactDensity ? 19 : relaxedDensity ? 21 : 20) : (compactDensity ? 17 : relaxedDensity ? 19 : 18),
@@ -70,7 +72,7 @@ function getPdfStyleConfig(resume: Resume) {
     linksRow: {
       display: 'flex',
       flexDirection: 'row',
-      justifyContent: 'center',
+      justifyContent: leftAligned ? 'flex-start' : 'center',
       gap: 8,
       flexWrap: 'wrap',
       marginTop: headerLineGap,

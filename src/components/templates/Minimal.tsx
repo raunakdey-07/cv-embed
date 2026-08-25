@@ -25,7 +25,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
   const options = resume.meta.documentOptions
   const bulletPrefix = options.bulletStyle === 'dash' ? '—' : '•'
 
-  const sectionClassName = `resume-template density-${densityMode} heading-${options.sectionHeadingStyle} font-${options.fontFamily} text-${options.fontSize} line-${options.lineHeight}`
+  const sectionClassName = `resume-template density-${densityMode} header-${options.headerAlignment ?? 'center'} heading-${options.sectionHeadingStyle} font-${options.fontFamily} text-${options.fontSize} line-${options.lineHeight}`
   const sectionOrder = [...new Set([...(options.sectionOrder ?? []), ...DEFAULT_SECTION_ORDER])]
 
   const linkText = (label: string, url: string) => (options.linkDisplay === 'url' ? url : label || url)

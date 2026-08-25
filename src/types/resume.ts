@@ -25,6 +25,8 @@ export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   'publications',
 ]
 
+export type HeaderAlignment = 'center' | 'left'
+
 export interface DocumentOptions {
   accentColor: string
   fontFamily:
@@ -42,6 +44,7 @@ export interface DocumentOptions {
   dateStyle: 'range' | 'compact' | 'short' | 'numeric' | 'iso'
   density: 'comfortable' | 'compact' | 'relaxed'
   linkDisplay: 'label' | 'url'
+  headerAlignment: HeaderAlignment
   showSections: Record<ResumeSectionKey, boolean>
   sectionOrder: ResumeSectionKey[]
 }
@@ -181,6 +184,7 @@ export function createDefaultDocumentOptions(): DocumentOptions {
     dateStyle: 'range',
     density: 'comfortable',
     linkDisplay: 'label',
+    headerAlignment: 'center',
     showSections: {
       // Basic starter set — optional sections are opt-in via the
       // "Visibility & Order" controls in the nav or Format panel.

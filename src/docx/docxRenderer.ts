@@ -308,9 +308,11 @@ function createResumeDocxDocument(resume: Resume): Document {
       )
     })
 
+  const headerAlign = options.headerAlignment === 'left' ? AlignmentType.LEFT : AlignmentType.CENTER
+
   const children: Paragraph[] = [
     new Paragraph({
-      alignment: AlignmentType.CENTER,
+      alignment: headerAlign,
       spacing: { after: 80 },
       children: [
         new TextRun({
@@ -327,7 +329,7 @@ function createResumeDocxDocument(resume: Resume): Document {
   if (resume.basics.headline) {
     children.push(
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment: headerAlign,
         spacing: { after: 60 },
         children: [
           new TextRun({
@@ -344,7 +346,7 @@ function createResumeDocxDocument(resume: Resume): Document {
   if (contact) {
     children.push(
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment: headerAlign,
         spacing: { after: 60 },
         children: [
           new TextRun({
@@ -361,7 +363,7 @@ function createResumeDocxDocument(resume: Resume): Document {
   if (linkRuns.length > 0) {
     children.push(
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment: headerAlign,
         spacing: { after: 100 },
         children: linkRuns,
       }),

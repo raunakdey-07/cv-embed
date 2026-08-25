@@ -1050,6 +1050,8 @@ export function BuilderPage() {
           formatSheet={
             <DocumentOptionsSection
               options={resume.meta.documentOptions}
+              template={resume.meta.template}
+              onTemplateChange={(template) => setResume((p) => ({ ...p, meta: { ...p.meta, template } }))}
               onChange={(documentOptions) => setResume((p) => ({ ...p, meta: { ...p.meta, documentOptions } }))}
             />
           }

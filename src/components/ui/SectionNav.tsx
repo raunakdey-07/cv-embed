@@ -107,6 +107,7 @@ export function SectionNav({
           onClick={() => { onFormatToggle(); onOrganizeClose() }}
         >
           <IconPaintbrush size={13} />
+          <IconChevronDown size={9} />
         </button>
         {formatOpen ? (
           <div className="organize-sheet format-sheet" role="dialog" aria-label="Formatting">

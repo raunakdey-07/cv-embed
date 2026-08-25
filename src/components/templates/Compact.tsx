@@ -28,7 +28,7 @@ export function CompactTemplate({ resume, primaryColor, densityMode = 'compact' 
   const options = resume.meta.documentOptions
   const bulletPrefix = options.bulletStyle === 'dash' ? '—' : '•'
 
-  const sectionClassName = `resume-template template-compact density-${densityMode} heading-${options.sectionHeadingStyle} font-${options.fontFamily} text-${options.fontSize} line-${options.lineHeight}`
+  const sectionClassName = `resume-template template-compact density-${densityMode} header-${options.headerAlignment ?? 'center'} heading-${options.sectionHeadingStyle} font-${options.fontFamily} text-${options.fontSize} line-${options.lineHeight}`
 
   const linkText = (label: string, url: string) => (options.linkDisplay === 'url' ? url : label || url)
   const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)

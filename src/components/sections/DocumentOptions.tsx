@@ -1,11 +1,13 @@
-import type { DocumentOptions } from '../../types/resume'
+import type { DocumentOptions, TemplateName } from '../../types/resume'
 
 interface DocumentOptionsSectionProps {
   options: DocumentOptions
+  template: TemplateName
+  onTemplateChange: (template: TemplateName) => void
   onChange: (next: DocumentOptions) => void
 }
 
-export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSectionProps) {
+export function DocumentOptionsSection({ options, template, onTemplateChange, onChange }: DocumentOptionsSectionProps) {
   const update = <K extends keyof DocumentOptions>(key: K, value: DocumentOptions[K]) => {
     onChange({ ...options, [key]: value })
   }
@@ -13,6 +15,18 @@ export function DocumentOptionsSection({ options, onChange }: DocumentOptionsSec
   return (
     <section className="panel format-panel">
       <div className="field-grid">
+        <label>Template
+          <select value={template} onChange={(e) => onTemplateChange(e.target.value as TemplateName)}>
+            <option value="minimal">Minimal — classic single column</option>
+            <option value="compact">Compact — two-column grid</option>
+          </select>
+        </label>
+        <label>Header Alignment
+          <select value={options.headerAlignment} onChange={(e) => update('headerAlignment', e.target.value as DocumentOptions['headerAlignment'])}>
+            <option value="center">Centered</option>
+            <option value="left">Left-aligned</option>
+          </select>
+        </label>
         <label>Accent Color <input type="color" value={options.accentColor} onChange={(e) => update('accentColor', e.target.value)} /></label>
         <label>Font
           <select value={options.fontFamily} onChange={(e) => update('fontFamily', e.target.value as DocumentOptions['fontFamily'])}>

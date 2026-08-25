@@ -1614,6 +1614,8 @@ h4.skill-cat-title { margin: 0 0 6px; }
 
 .resume-header p  { margin: 3px 0; color: #374151; }
 .resume-header    { text-align: center; }
+.resume-template.header-left .resume-header { text-align: left; align-items: flex-start; }
+.resume-template.header-left .link-row      { justify-content: flex-start; }
 .link-row         { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 
 .resume-template section { margin-top: 14px; border-top: 1px solid #e6e9f2; padding-top: 8px; }
@@ -1749,6 +1751,28 @@ h4.skill-cat-title { margin: 0 0 6px; }
   /* Only the active pane renders on mobile; drop the old stacking order. */
   .right-pane { order: initial; }
   .left-pane { order: initial; }
+
+  /* Subtle fade + rise when switching Edit ⇄ Preview */
+  .mobile-pane-enter {
+    animation: pane-enter 0.22s ease-out both;
+  }
+}
+
+@keyframes pane-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-pane-enter {
+    animation: none;
+  }
 }
 
 /* ═══════════════════════ Responsive ═══════════════════════ */
