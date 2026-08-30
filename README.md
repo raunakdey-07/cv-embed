@@ -6,10 +6,12 @@ CV-Embed is a fast resume builder built with React + TypeScript. It gives you a 
 
 - **Resume Builder UI**: Structured sections for basics, education, experience, projects, skills, certifications, accomplishments, activities, volunteering, and publications. New resumes start with a basic set (Summary, Education, Experience, Projects, Skills); the rest are opt-in.
 - **Live Preview**: Real-time visual preview while editing with typography, density, and section-order controls.
-- **Formatting Options**: Accent color, font family, font size, line height, heading style, bullet style, date style, and density — applied consistently across the live preview **and** every export format (PDF, DOCX).
+- **Format Panel**: Accent, font, size, line-height, headings, bullets, dates, density, link display, template, header alignment — no visibility/order (those live in the organize sheet).
+- **Organize Sheet**: Toggle sections (default basic 5 enabled) and reorder; changes sync instantly to form, nav, preview, and exports.
 - **Section Visibility & Order**: Toggle sections on/off and reorder them from the nav's organize sheet or the Format panel; the editing form, nav, preview, and all exports stay in sync.
 - **Export Options**: Download polished resumes as **PDF**, **DOCX**, and raw **JSON**.
-- **Embed Toolkit**: Generate a portable embed URL, iframe snippet, and SDK script integration block.
+- **Mobile UX**: Lazy-loaded PDF engine, smooth edit↔preview pane transition, taller nav bar, format dropdown beside organize, and responsive embed panel.
+- **Embed Toolkit**: Friendly snippets, live preview iframe, SDK v2, and user-friendly dropdown flow.
 - **SDK v2 Bridge**: `postMessage` event API (`ready`, `heightChange`, `validationChange`, `sectionFocus`, `export`) with callback hooks.
 - **Auto-height Embeds**: Resize-aware iframe integration for portal layouts.
 - **Integration Pack Copy**: One-click copy for URL + iframe + React + SDK + event contract.
@@ -143,7 +145,9 @@ All options live in the Format panel (and section visibility/order also in the n
 | Line Height | Tight / Normal / Relaxed | All outputs |
 | Headings | Uppercase + Rule / Bold Titles / Minimal | All outputs |
 | Bullets | Dot / Dash | All outputs |
-| Dates | `Jun 2024 - Aug 2025` / `Jun 2024–Aug 2025` | All outputs |
+| Dates | Range / Compact / Short / Numeric / ISO | All outputs |
+| Template | Minimal / Compact | All outputs |
+| Header Align | Center / Left | All outputs |
 | Density | Comfortable / Compact / Relaxed | Spacing scale in preview/PDF; DOCX uses line-height equivalent |
 | Link Display | Short label / Full URL | Header links in all outputs |
 | Visibility & Order | Per-section toggle + ↑↓ reorder | Form, nav, preview, and exports share one source of truth |
