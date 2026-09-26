@@ -1,255 +1,196 @@
-(function (global) {
-  function randomEmbedId() {
-    return 'cvembed_' + Math.random().toString(36).slice(2, 10)
-  }
-
-  function getDefaultBaseUrl() {
-    var script = document.currentScript
-    if (script && script.src) {
-      try {
-        var scriptUrl = new URL(script.src, window.location.href)
-        return scriptUrl.origin
-      } catch (_) {
-      }
-    }
-
-    var scripts = document.getElementsByTagName('script')
-    for (var index = scripts.length - 1; index >= 0; index -= 1) {
-      var src = scripts[index].src || ''
-      if (/\/sdk\.js(\?|$)/.test(src)) {
-        try {
-          var fallbackScriptUrl = new URL(src, window.location.href)
-          return fallbackScriptUrl.origin
-        } catch (_) {
-        }
-      }
-    }
-
-    return window.location.origin
-  }
-
+var CVEmbed = (function(exports) {
+  "use strict";
   function encodeResumeData(resumeData) {
-    var json = JSON.stringify(resumeData)
-    var utf8 = unescape(encodeURIComponent(json))
-    var base64 = btoa(utf8)
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+    const json = JSON.stringify(resumeData);
+    const bytes = new TextEncoder().encode(json);
+    let binary = "";
+    for (const byte of bytes) {
+      binary += String.fromCharCode(byte);
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
-
+  const SDK_SCRIPT_ORIGIN = typeof document === "undefined" ? null : (() => {
+    const script = document.currentScript;
+    if (!(script == null ? void 0 : script.src)) return null;
+    try {
+      return new URL(script.src, window.location.href).origin;
+    } catch (e) {
+      return null;
+    }
+  })();
+  function getDefaultBaseUrl() {
+    return SDK_SCRIPT_ORIGIN != null ? SDK_SCRIPT_ORIGIN : window.location.origin;
+  }
   function resolveTarget(target) {
-    if (typeof target === 'string') {
-      return document.querySelector(target)
+    if (typeof target === "string") {
+      return document.querySelector(target);
     }
-
-    if (target && target.nodeType === 1) {
-      return target
-    }
-
-    return null
+    return target;
   }
-
-  function buildEmbedUrl(baseUrl, resumeId, theme, options, embedId) {
-    var hasResumeData = !!(options && options.resumeData)
-    var pathResumeId = resumeId || 'portable'
-    var url = new URL('/embed/' + encodeURIComponent(pathResumeId), baseUrl)
-
-    if (hasResumeData) {
-      var fragment = new URLSearchParams()
-      fragment.set('data', encodeResumeData(options.resumeData))
-      url.hash = fragment.toString()
-    }
-
-    if (theme && theme.primaryColor) {
-      url.searchParams.set('primaryColor', theme.primaryColor)
-    }
-
-    if (theme && theme.density) {
-      url.searchParams.set('density', theme.density)
-    }
-
-    if (options && options.showDownload === false) {
-      url.searchParams.set('showDownload', '0')
-    }
-
-    if (options && options.disableDownload === true) {
-      url.searchParams.set('disableDownload', '1')
-    }
-
-    if (options && options.mode) {
-      url.searchParams.set('mode', options.mode)
-    }
-
-    if (options && options.debug) {
-      url.searchParams.set('debug', '1')
-    }
-
-    if (options && options.disableImport) {
-      url.searchParams.set('disableImport', '1')
-    }
-
-    if (options && options.readOnlySections && options.readOnlySections.length > 0) {
-      url.searchParams.set('readOnlySections', options.readOnlySections.join(','))
-    }
-
-    if (options && options.lockedTemplate) {
-      url.searchParams.set('lockedTemplate', options.lockedTemplate)
-    }
-
-    url.searchParams.set('eventOrigin', (options && options.eventTargetOrigin) || window.location.origin)
-
-    if (theme && typeof theme.fontScale === 'number') {
-      url.searchParams.set('fontScale', String(theme.fontScale))
-    }
-
-    if (theme && typeof theme.radius === 'number') {
-      url.searchParams.set('radius', String(theme.radius))
-    }
-
-    url.searchParams.set('sdkVersion', '2')
-    url.searchParams.set('embedId', embedId)
-
-    return url.toString()
+  function randomEmbedId() {
+    return `cvembed_${Math.random().toString(36).slice(2, 10)}`;
   }
-
-  function mergeEvents(current, next) {
-    var out = {}
-    var key
-    current = current || {}
-    next = next || {}
-    for (key in current) out[key] = current[key]
-    for (key in next) out[key] = next[key]
-    return out
+  function mergeEvents(left, right) {
+    return { ...left != null ? left : {}, ...right != null ? right : {} };
   }
-
-  var activeInstances = new WeakMap()
-
-  var CVEmbed = {
-    render: function render(config) {
-      if (!config || !config.target || (!config.resumeId && !config.resumeData)) {
-        throw new Error('CVEmbed.render requires target and either resumeId or resumeData')
+  const activeInstances = /* @__PURE__ */ new WeakMap();
+  function buildEmbedUrl(config, embedId) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    const baseUrl = (_a = config.baseUrl) != null ? _a : getDefaultBaseUrl();
+    const resumePath = encodeURIComponent((_b = config.resumeId) != null ? _b : "portable");
+    const url = new URL(`/embed/${resumePath}`, baseUrl);
+    if (config.resumeData) {
+      const fragment = new URLSearchParams();
+      fragment.set("data", encodeResumeData(config.resumeData));
+      url.hash = fragment.toString();
+    }
+    if ((_c = config.theme) == null ? void 0 : _c.primaryColor) {
+      url.searchParams.set("primaryColor", config.theme.primaryColor);
+    }
+    if ((_d = config.theme) == null ? void 0 : _d.density) {
+      url.searchParams.set("density", config.theme.density);
+    }
+    if (((_e = config.options) == null ? void 0 : _e.showDownload) === false) {
+      url.searchParams.set("showDownload", "0");
+    }
+    if (((_f = config.options) == null ? void 0 : _f.disableDownload) === true) {
+      url.searchParams.set("disableDownload", "1");
+    }
+    if ((_g = config.options) == null ? void 0 : _g.mode) {
+      url.searchParams.set("mode", config.options.mode);
+    }
+    if ((_h = config.options) == null ? void 0 : _h.debug) {
+      url.searchParams.set("debug", "1");
+    }
+    if (((_i = config.options) == null ? void 0 : _i.readOnlySections) && config.options.readOnlySections.length > 0) {
+      url.searchParams.set("readOnlySections", config.options.readOnlySections.join(","));
+    }
+    if ((_j = config.options) == null ? void 0 : _j.lockedTemplate) {
+      url.searchParams.set("lockedTemplate", config.options.lockedTemplate);
+    }
+    if ((_k = config.options) == null ? void 0 : _k.disableImport) {
+      url.searchParams.set("disableImport", "1");
+    }
+    url.searchParams.set("eventOrigin", (_m = (_l = config.options) == null ? void 0 : _l.eventTargetOrigin) != null ? _m : window.location.origin);
+    if (typeof ((_n = config.theme) == null ? void 0 : _n.fontScale) === "number") {
+      url.searchParams.set("fontScale", String(config.theme.fontScale));
+    }
+    if (typeof ((_o = config.theme) == null ? void 0 : _o.radius) === "number") {
+      url.searchParams.set("radius", String(config.theme.radius));
+    }
+    url.searchParams.set("sdkVersion", "2");
+    if (embedId) {
+      url.searchParams.set("embedId", embedId);
+    }
+    return url.toString();
+  }
+  function renderEmbed(config) {
+    var _a, _b, _c, _d;
+    if (!config.resumeId && !config.resumeData) {
+      throw new Error("resumeId or resumeData is required");
+    }
+    const target = resolveTarget(config.target);
+    if (!target) {
+      throw new Error(`Target not found: ${String(config.target)}`);
+    }
+    (_a = activeInstances.get(target)) == null ? void 0 : _a.destroy();
+    let activeConfig = { ...config };
+    let listeners = mergeEvents(config.events);
+    const embedId = randomEmbedId();
+    const iframe = document.createElement("iframe");
+    iframe.src = buildEmbedUrl(activeConfig, embedId);
+    iframe.width = String((_b = config.width) != null ? _b : "100%");
+    iframe.height = String((_c = config.height) != null ? _c : 1100);
+    iframe.frameBorder = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("loading", "lazy");
+    iframe.setAttribute("title", (_d = config.title) != null ? _d : "Embedded CV-Embed Resume");
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    const onMessage = (event) => {
+      var _a2, _b2, _c2, _d2, _e, _f, _g, _h, _i;
+      const expectedOrigin = new URL((_a2 = activeConfig.baseUrl) != null ? _a2 : getDefaultBaseUrl(), window.location.href).origin;
+      if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) {
+        return;
       }
-
-      var target = resolveTarget(config.target)
-      if (!target) {
-        throw new Error('Target not found. Provide a valid selector or HTMLElement')
+      const data = event.data;
+      if (!data || data.source !== "cv-embed" || data.version !== "2" || data.embedId !== embedId || !data.payload || typeof data.payload !== "object") {
+        return;
       }
-
-      var baseUrl = config.baseUrl || getDefaultBaseUrl()
-      if (activeInstances.has(target)) {
-        activeInstances.get(target).destroy()
-      }
-      var embedId = randomEmbedId()
-      var listeners = mergeEvents(config.events)
-      var activeConfig = config
-
-      var iframe = document.createElement('iframe')
-      iframe.src = buildEmbedUrl(
-        baseUrl,
-        config.resumeId,
-        config.theme || {},
-        {
-          showDownload: config.options && config.options.showDownload,
-          disableDownload: config.options && config.options.disableDownload,
-          mode: config.options && config.options.mode,
-          debug: config.options && config.options.debug,
-          disableImport: config.options && config.options.disableImport,
-          readOnlySections: config.options && config.options.readOnlySections,
-          lockedTemplate: config.options && config.options.lockedTemplate,
-          eventTargetOrigin: config.options && config.options.eventTargetOrigin,
-          resumeData: config.resumeData,
-        },
-        embedId
-      )
-      iframe.width = String(config.width == null ? '100%' : config.width)
-      iframe.height = String(config.height == null ? 1100 : config.height)
-      iframe.frameBorder = '0'
-      iframe.style.border = '0'
-      iframe.setAttribute('loading', 'lazy')
-      iframe.setAttribute('title', config.title || 'Embedded CV-Embed Resume')
-      iframe.referrerPolicy = 'strict-origin-when-cross-origin'
-
-      function onMessage(event) {
-        var data = event.data || {}
-        var expectedOrigin = new URL(activeConfig.baseUrl || getDefaultBaseUrl(), window.location.href).origin
-        if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) return
-        if (data.source !== 'cv-embed' || data.version !== '2' || data.embedId !== embedId || !data.payload || typeof data.payload !== 'object') return
-
-        if (listeners.onMessage) listeners.onMessage(data)
-        if (data.event === 'ready' && listeners.onReady) listeners.onReady(data.payload)
-        if (data.event === 'validationChange' && listeners.onValidationChange) listeners.onValidationChange(data.payload)
-        if (data.event === 'export' && listeners.onExport) listeners.onExport(data.payload)
-        if (data.event === 'sectionFocus' && listeners.onSectionFocus) listeners.onSectionFocus(data.payload)
-        if (data.event === 'heightChange') {
-          var height = Number(data.payload && data.payload.height)
-          if ((!activeConfig.options || activeConfig.options.autoHeight !== false) && Number.isFinite(height) && height > 0) {
-            var appliedHeight = Math.min(10000, Math.round(height))
-            iframe.height = String(appliedHeight)
-            if (listeners.onHeightChange) listeners.onHeightChange({ height: appliedHeight })
-            return
-          }
-          if (listeners.onHeightChange) listeners.onHeightChange({ height: height })
+      (_b2 = listeners.onMessage) == null ? void 0 : _b2.call(listeners, data);
+      if (data.event === "ready") (_c2 = listeners.onReady) == null ? void 0 : _c2.call(listeners, data.payload);
+      if (data.event === "validationChange") (_d2 = listeners.onValidationChange) == null ? void 0 : _d2.call(listeners, data.payload);
+      if (data.event === "sectionFocus") (_e = listeners.onSectionFocus) == null ? void 0 : _e.call(listeners, data.payload);
+      if (data.event === "export") (_f = listeners.onExport) == null ? void 0 : _f.call(listeners, data.payload);
+      if (data.event === "heightChange") {
+        const nextHeight = Number(data.payload.height);
+        if (((_g = activeConfig.options) == null ? void 0 : _g.autoHeight) !== false && Number.isFinite(nextHeight) && nextHeight > 0) {
+          const appliedHeight = Math.min(1e4, Math.round(nextHeight));
+          iframe.height = String(appliedHeight);
+          (_h = listeners.onHeightChange) == null ? void 0 : _h.call(listeners, { height: appliedHeight });
+          return;
         }
+        (_i = listeners.onHeightChange) == null ? void 0 : _i.call(listeners, { height: nextHeight });
       }
-
-      window.addEventListener('message', onMessage)
-
-      target.innerHTML = ''
-      target.appendChild(iframe)
-
-      var instance = {
-        destroy: function () {
-          window.removeEventListener('message', onMessage)
-          if (activeInstances.get(target) === instance) {
-            activeInstances.delete(target)
-          }
-          if (iframe.parentElement === target) {
-            target.removeChild(iframe)
-          }
-        },
-        update: function (nextConfig) {
-          nextConfig = nextConfig || {}
-          activeConfig = {
-            target: activeConfig.target,
-            resumeId: (typeof nextConfig.resumeId !== 'undefined') ? nextConfig.resumeId : activeConfig.resumeId,
-            resumeData: (typeof nextConfig.resumeData !== 'undefined') ? nextConfig.resumeData : activeConfig.resumeData,
-            baseUrl: (typeof nextConfig.baseUrl !== 'undefined') ? nextConfig.baseUrl : activeConfig.baseUrl,
-            width: (typeof nextConfig.width !== 'undefined') ? nextConfig.width : activeConfig.width,
-            height: (typeof nextConfig.height !== 'undefined') ? nextConfig.height : activeConfig.height,
-            title: (typeof nextConfig.title !== 'undefined') ? nextConfig.title : activeConfig.title,
-            theme: Object.assign({}, activeConfig.theme || {}, nextConfig.theme || {}),
-            options: Object.assign({}, activeConfig.options || {}, nextConfig.options || {}),
-            events: mergeEvents(activeConfig.events, nextConfig.events),
-          }
-
-          listeners = mergeEvents(listeners, nextConfig.events)
-          var nextUrl = buildEmbedUrl(
-            activeConfig.baseUrl || getDefaultBaseUrl(),
-            activeConfig.resumeId,
-            activeConfig.theme || {},
-            Object.assign({}, activeConfig.options || {}, { resumeData: activeConfig.resumeData }),
-            embedId
-          )
-          if (iframe.src !== nextUrl) iframe.src = nextUrl
-          if (typeof nextConfig.title !== 'undefined') iframe.title = nextConfig.title
-
-          if (typeof nextConfig.width !== 'undefined') iframe.width = String(nextConfig.width)
-          if (typeof nextConfig.height !== 'undefined') iframe.height = String(nextConfig.height)
-        },
-        getIframe: function () {
-          return iframe
-        },
-        on: function (eventName, handler) {
-          listeners[eventName] = handler
-        },
-        off: function (eventName, handler) {
-          if (!handler || listeners[eventName] === handler) {
-            delete listeners[eventName]
-          }
-        },
+    };
+    window.addEventListener("message", onMessage);
+    target.innerHTML = "";
+    target.appendChild(iframe);
+    const destroy = () => {
+      window.removeEventListener("message", onMessage);
+      if (activeInstances.get(target) === instance) {
+        activeInstances.delete(target);
       }
-      activeInstances.set(target, instance)
-      return instance
-    },
+      if (iframe.parentElement === target) {
+        target.removeChild(iframe);
+      }
+    };
+    const update = (nextConfig) => {
+      var _a2, _b2, _c2, _d2;
+      activeConfig = {
+        ...activeConfig,
+        ...nextConfig,
+        theme: { ...(_a2 = activeConfig.theme) != null ? _a2 : {}, ...(_b2 = nextConfig.theme) != null ? _b2 : {} },
+        options: { ...(_c2 = activeConfig.options) != null ? _c2 : {}, ...(_d2 = nextConfig.options) != null ? _d2 : {} },
+        events: mergeEvents(activeConfig.events, nextConfig.events)
+      };
+      listeners = mergeEvents(listeners, nextConfig.events);
+      const nextUrl = buildEmbedUrl(activeConfig, embedId);
+      if (iframe.src !== nextUrl) {
+        iframe.src = nextUrl;
+      }
+      if (typeof nextConfig.title !== "undefined") {
+        iframe.title = nextConfig.title;
+      }
+      if (typeof nextConfig.width !== "undefined") {
+        iframe.width = String(nextConfig.width);
+      }
+      if (typeof nextConfig.height !== "undefined") {
+        iframe.height = String(nextConfig.height);
+      }
+    };
+    const on = (eventName, handler) => {
+      listeners[eventName] = handler;
+    };
+    const off = (eventName, handler) => {
+      if (!handler || listeners[eventName] === handler) {
+        listeners[eventName] = void 0;
+      }
+    };
+    const instance = {
+      destroy,
+      update,
+      getIframe: () => iframe,
+      on,
+      off
+    };
+    activeInstances.set(target, instance);
+    return instance;
   }
-
-  global.CVEmbed = CVEmbed
-})(window)
+  const CVEmbed2 = {
+    render: (config) => renderEmbed(config)
+  };
+  exports.CVEmbed = CVEmbed2;
+  Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+  return exports;
+})({});
+CVEmbed = CVEmbed.CVEmbed;

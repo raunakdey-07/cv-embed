@@ -67,16 +67,18 @@ function encodeResumeData(resumeData: unknown): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
-function getDefaultBaseUrl(): string {
+const SDK_SCRIPT_ORIGIN = typeof document === 'undefined' ? null : (() => {
   const script = document.currentScript as HTMLScriptElement | null
-  if (script?.src) {
-    try {
-      return new URL(script.src, window.location.href).origin
-    } catch {
-      // Fall through to the current origin.
-    }
+  if (!script?.src) return null
+  try {
+    return new URL(script.src, window.location.href).origin
+  } catch {
+    return null
   }
-  return window.location.origin
+})()
+
+function getDefaultBaseUrl(): string {
+  return SDK_SCRIPT_ORIGIN ?? window.location.origin
 }
 
 function resolveTarget(target: string | HTMLElement): HTMLElement | null {
