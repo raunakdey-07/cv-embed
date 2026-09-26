@@ -10,12 +10,12 @@ Implementation date: 2026-09-24
 | --- | --- | --- |
 | `npm run lint` | Passed | Passed |
 | `npm run build` | Passed | Passed, with production entry assertion |
-| `npm run test:unit` | 3 passed | 51 passed across 6 files |
-| `npm run test:e2e` | 13 passed, 11 skipped | 28 passed, 20 skipped across 2 projects |
+| `npm run test:unit` | 3 passed | 59 passed across 7 files |
+| `npm run test:e2e` | 13 passed, 11 skipped | 29 passed, 21 skipped across 2 projects |
 | Production PDF preload | Present | Absent |
 | `npm audit --omit=dev` | 4 high | 0 high after upgrading `docx` to 9.7.2 |
 
-The 20 E2E skips are project-specific duplicates. Each test runs in the project where it applies, so the 28 passes cover both desktop and mobile behavior.
+The 21 E2E skips are project-specific duplicates. Each test runs in the project where it applies, so the 29 passes cover both desktop and mobile behavior.
 
 ## Issues Fixed
 
@@ -151,11 +151,11 @@ Fragment links reduce request-log exposure but do not make a shared CV private. 
 
 ### SDK-003 single generated SDK source
 
-The TypeScript SDK and shipped `public/sdk.js` were updated together and the shipped file is covered by E2E tests. A generated-artifact build pipeline and CI drift check remain future work.
+Resolved. `public/sdk.js` is now generated deterministically from `sdk/index.ts` with `npm run build:sdk`. `npm run build` runs `npm run check:sdk`, which compares the generated output with the checked-in artifact and fails on drift.
 
 ### CODE-001 shared renderer view model
 
-The four renderers still have separate presentation code. The changes removed the highest-risk drift and added shared URL/content checks, but a full view-model refactor was not necessary for this pass.
+Resolved for ordering, visibility, and meaningful-content decisions. `src/lib/contentChecks.ts` now exposes the ordered section list, visibility check, section-content check, and renderable section list used by the editor and all four renderers. Presentation and export formatting remain renderer-specific.
 
 ### DESIGN-001 font loading
 
@@ -183,8 +183,8 @@ The final command sequence was run on the completed tree:
 - `npm run lint`: passed.
 - `npm run build`: passed.
 - Production entry assertion: passed.
-- `npm run test:unit`: 51 passed.
-- `npm run test:e2e`: 28 passed, 20 project-specific skips.
+- `npm run test:unit`: 59 passed.
+- `npm run test:e2e`: 29 passed, 21 project-specific skips.
 - `npm audit --omit=dev --json`: reports 0 vulnerabilities after the DOCX upgrade.
 
 # Finalization Pass
@@ -290,9 +290,149 @@ Tests in `tests/e2e/default-state.spec.ts` cover empty, one-page, and long multi
 
 ## Finalization verification
 
-- Unit tests: 51 passed across 6 files.
-- E2E tests: 28 passed, with 20 intentional project-specific skips across 2 projects.
+- Unit tests: 59 passed across 7 files.
+- E2E tests: 29 passed, with 21 intentional project-specific skips across 2 projects.
 - Production build and entry assertion: passed.
 - `npm audit --omit=dev`: 0 vulnerabilities.
 - DOCX 9.7.2 export path was exercised after the upgrade.
 - No deployment or GitHub push was performed.
+
+# Post-CI Remaining Risk Review
+
+## Current risk table
+
+| Risk | Still present? | Severity | Safe to fix? | External dependency? | Product decision? |
+| --- | --- | --- | --- | --- | --- |
+| 280-320 px header overflow | No | P1 | Fixed | No | No |
+| SDK source/artifact drift | No | P1 | Fixed | No | No |
+| Shared section ordering and visibility drift | No for ordering/visibility/content | P2 | Fixed | No | No |
+| Portable link data in HTTP requests | No | P1 | Verified and tested | No | No |
+| Full CJK/non-Latin PDF support | Yes | P1 | No | Font asset and licensing | No, but budget and UX approval needed |
+| Compact PDF/DOCX parity | Yes | P1 | No | No | Yes |
+| PDF benchmark heading coverage | Yes | P2 | Not safely | Reliable in-browser PDF text parser | No |
+| DOCX pagination in Word/LibreOffice | Yes | P2 | Not proportionately | LibreOffice/Word runner | No |
+| Shared private resume hosting | Yes | P1 future option | No | Backend/auth/storage | Yes |
+| Undo for destructive actions | Yes | P2 | Architecture dependent | No | Yes |
+| Print output | Yes, unclaimed | P3 | Not currently | No | Yes |
+| Locale-specific dates | Yes, unclaimed | P3 | Not currently | No | Yes |
+| Google font startup cost | Yes | P2 | Needs visual review | No | No |
+| Non-Chromium CI projects | Yes | P2 | Possible later | Browser downloads | No |
+| Quality score behavior | No known defect | P1 reviewed | Tests added; formula unchanged | No | Only if product changes rubric |
+
+## Evidence and actions
+
+### Responsive overflow
+
+The CI failure was real and font-metric dependent. With the production web font loaded, the Import and Embed header action group measured 176.5 px and pushed the document to 323 px at a 280-320 px viewport. The fix makes the two header actions icon-only below 480 px while retaining 40 px touch targets and accessible names. The regression test now checks 280, 320, 375, 768, and 1024 px, including both document and body widths.
+
+### SDK artifact
+
+`public/sdk.js` is generated from `sdk/index.ts` using the existing Vite dependency. CI performs a non-writing build and compares the output byte-for-byte. This prevents the hand-maintained script from drifting again.
+
+### Renderer view model
+
+The shared model owns only:
+
+- merged, de-duplicated section order
+- visible versus hidden state
+- meaningful section content
+
+Each renderer still owns its markup, layout, and document-specific formatting.
+
+### Portable link privacy
+
+New browser coverage verifies that the embed iframe is requested and no request URL contains `data=`. Resume payloads remain in the URL fragment, where browsers do not transmit them in HTTP request targets. Links remain public to anyone who possesses them; authenticated or expiring hosting remains a product decision.
+
+### Quality score
+
+Representative tests now cover empty, Basics-only, sparse, balanced, high-quality, warning-heavy, long-content, many-section, hidden-section, and structurally invalid CVs. No discontinuity or misleading zero-state behavior was found, so the formula remains unchanged.
+
+### PDF benchmark
+
+The current browser benchmark searches compressed PDF bytes for heading text. PDF content streams are compressed, so this metric can report false negatives. Adding a PDF parser would affect the client or add a large dependency. The risk remains documented rather than adding an unreliable parser to production code.
+
+### DOCX pagination
+
+LibreOffice and Word are not available in the current environment. Adding a large office suite only for a benchmark would make CI slow and fragile. DOCX structure, Unicode, and keep-together properties remain tested; rendered pagination is documented as a future dedicated job.
+
+### CJK PDF support
+
+The guard remains. A full Noto Sans SC package is approximately 74.5 MB unpacked, which is not acceptable as an eager dependency. The error now names a small sample of unsupported characters and directs the user to DOCX. A per-script lazy font pipeline is still required before claiming CJK PDF support.
+
+### Compact export
+
+Preview-only behavior is accurate and documented. Matching the two-column preview in DOCX would require a table-based or section-based layout with dedicated ATS reading-order and pagination fixtures. It remains deferred rather than weakening the current single-column export.
+
+### Print and locale
+
+The product does not currently claim print-specific output or locale-aware dates. Adding either would be feature work rather than a regression fix, so both remain deferred.
+
+### Destructive actions
+
+Explicit remove controls exist for individual entries, but import replacement and row removal do not share a general undo system. A lightweight confirmation could be added, but a consistent undo experience requires product and state-architecture decisions.
+
+# Post-CI Regression Pass
+
+Date: 2026-09-26
+
+## Mobile horizontal overflow
+
+The first post-push CI run failed `builder reflows without page-level horizontal scrolling` in
+`mobile-chromium` at the 280 px viewport: `scrollWidth` measured 323 against a 281 px client width.
+
+A DOM probe identified the offender as `.app-header-actions`, which ended at 323.3 px. The
+embedded web font metrics widened the Import and Embed buttons, and the header action group could
+not shrink. `.section-nav-tabs` also overflowed, but that element is intentionally horizontally
+scrollable and never widened the document.
+
+The fix makes the Import and Embed controls icon-only squares below 480 px. Their `aria-label` and
+`title` are unchanged, so the accessible name and the browser tooltip are identical. No global
+`overflow-x: hidden` was added, because that would hide real overflow rather than remove it.
+
+The regression test now checks 280, 320, 375, 768, and 1024 px against both `documentElement` and
+`body`, and waits for `document.fonts.ready`. The font wait matters: with web fonts blocked the page
+fit at 280 px, so the failure only appeared once metrics were applied.
+
+| Viewport | `documentElement` scroll/client | `body` scroll/client |
+| --- | --- | --- |
+| 280 | 280 / 280 | 280 / 280 |
+| 281 | 281 / 281 | 281 / 281 |
+| 320 | 320 / 320 | 320 / 320 |
+| 375 | 375 / 375 | 375 / 375 |
+| 768 | 768 / 768 | 768 / 768 |
+| 1024 | 1024 / 1024 | 1024 / 1024 |
+
+## Generated SDK artifact
+
+`public/sdk.js` was previously hand-maintained and could silently drift from `sdk/index.ts`.
+`scripts/build-sdk.mjs` now builds the SDK as an IIFE and writes the artifact. `npm run build` runs
+`check:sdk`, which fails when the checked-in file differs from the build output.
+
+The IIFE exposes a module namespace, so the build appends `CVEmbed = CVEmbed.CVEmbed;` to preserve
+the documented global contract of `window.CVEmbed.render(...)`. Without the footer the global became
+`window.CVEmbed.CVEmbed.render` and both embed suites failed.
+
+`getSdkScriptOrigin` now captures the script origin at module load rather than resolving it per
+message, so origin validation is stable for the lifetime of the SDK.
+
+## Shared section view model
+
+`src/lib/contentChecks.ts` now owns section order, visibility, and meaningful-content decisions for
+`BuilderPage`, `Minimal`, `Compact`, the PDF renderer, and the DOCX renderer. Markup, layout, and
+document-specific formatting stay in each renderer. This removes duplicated business logic without
+introducing a new presentation abstraction.
+
+## Performance after this pass
+
+| Metric | Baseline | Previous pass | This pass |
+| --- | --- | --- | --- |
+| First-visit transfer (Timing API) | about 648 kB | about 123 kB | 122.4 kB |
+| PDF chunk requests on first visit | 1 | 0 | 0 |
+| Main entry gzip | 36.38 kB | 41.24 kB | 41.46 kB |
+| React vendor gzip | 73.65 kB | 74.39 kB | 74.39 kB |
+| CSS gzip | 6.06 kB | 6.47 kB | 6.50 kB |
+| PDF chunk gzip when requested | 529.90 kB | 529.19 kB | 529.06 kB |
+
+Measured against `vite preview` on the production build at 1280x900. The page-count change did not
+introduce PDF initialization: the build-time entry assertion and both PDF lazy-load E2E tests still
+pass.
