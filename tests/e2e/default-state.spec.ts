@@ -78,15 +78,20 @@ test('fresh CV shows the five core sections as empty and scores zero', async ({ 
 test('builder reflows without page-level horizontal scrolling', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'mobile-only flow')
 
-  for (const width of [280, 768, 1024]) {
+  for (const width of [280, 320, 375, 768, 1024]) {
     await page.setViewportSize({ width, height: 800 })
     await page.goto('/builder')
     await expect(page.getByText('Resume Readiness')).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
     const widths = await page.evaluate(() => ({
-      client: document.documentElement.clientWidth,
-      scroll: document.documentElement.scrollWidth,
+      docClient: document.documentElement.clientWidth,
+      docScroll: document.documentElement.scrollWidth,
+      bodyClient: document.body.clientWidth,
+      bodyScroll: document.body.scrollWidth,
     }))
-    expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1)
+    const message = `${width}px: ${JSON.stringify(widths)}`
+    expect(widths.docScroll, message).toBeLessThanOrEqual(widths.docClient + 1)
+    expect(widths.bodyScroll, message).toBeLessThanOrEqual(widths.bodyClient + 1)
   }
 })
 

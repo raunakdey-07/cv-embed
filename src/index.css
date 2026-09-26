@@ -2289,6 +2289,19 @@ h4.skill-cat-title { margin: 0 0 6px; }
     padding: 0 8px;
   }
 
+  .header-import-btn,
+  .header-embed-btn {
+    width: 40px;
+    min-height: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .header-import-btn span,
+  .header-embed-btn span {
+    display: none;
+  }
+
   .app-main {
     padding: 5px;
   }
