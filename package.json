@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/check-production-build.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:unit": "vitest run",
@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
-    "docx": "^9.6.0",
+    "docx": "^9.7.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "^7.18.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
