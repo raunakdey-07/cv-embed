@@ -9,17 +9,17 @@ CV-Embed is a fast resume builder built with React + TypeScript. It gives you a 
 - **Format Panel**: Accent, font, size, line-height, headings, bullets, dates, density, link display, template, header alignment — no visibility/order (those live in the organize sheet).
 - **Organize Sheet**: Toggle sections (default basic 5 enabled) and reorder; changes sync instantly to form, nav, preview, and exports.
 - **Section Visibility & Order**: Toggle sections on/off and reorder them from the nav's organize sheet or the Format panel; the editing form, nav, preview, and all exports stay in sync.
-- **Export Options**: Download polished resumes as **PDF**, **DOCX**, and raw **JSON**.
+- **Export Options**: Download polished resumes as **PDF**, **DOCX**, and raw **JSON**. PDF export stops with a clear message when the built-in PDF fonts cannot represent the entered characters; DOCX remains Unicode-capable.
 - **Mobile UX**: Lazy-loaded PDF engine, smooth edit↔preview pane transition, taller nav bar, format dropdown beside organize, and responsive embed panel.
 - **Embed Toolkit**: Friendly snippets, live preview iframe, SDK v2, and user-friendly dropdown flow.
 - **SDK v2 Bridge**: `postMessage` event API (`ready`, `heightChange`, `validationChange`, `sectionFocus`, `export`) with callback hooks.
 - **Auto-height Embeds**: Resize-aware iframe integration for portal layouts.
 - **Integration Pack Copy**: One-click copy for URL + iframe + React + SDK + event contract.
-- **Host Controls**: Guided mode, debug mode, locked template, read-only sections, download/import toggles.
-- **Validation & Scoring**: Inline error/warning checks with a resume quality score indicator.
-- **Draft Persistence**: Saves progress in browser storage so your data survives refreshes.
-- **Portable Data**: Import/export normalized resume JSON for backup and migration.
-- **Performance**: PDF engine (~1.5 MB) is lazy-loaded — on mobile only when you actually export or open the embed panel.
+- **Host Controls**: Guided mode, debug mode, locked template, read-only metadata, and builder-link visibility. See the SDK contract for current limits.
+- **Validation & Scoring**: Visibility-aware error and warning checks with a resume quality score indicator.
+- **Draft Persistence**: Saves progress in guarded local browser storage so your data survives refreshes and tab changes.
+- **Portable Data**: Import/export normalized resume JSON for backup and migration. Portable links keep resume data in the URL fragment, where the browser does not send it in the HTTP request. Anyone with the link can still read the CV.
+- **Performance**: PDF engine (~1.5 MB) loads only when export or embed tools request it.
 
 ## Tech Stack
 
@@ -66,7 +66,7 @@ npm run bench:server # Run local Chromium benchmark server
 - `/` — Main resume builder
 - `/builder` — Builder alias for shared links
 - `/embed/:resumeId` — Embedded resume view
-- `/embed/portable?data=...` — Encoded portable embed payload
+- `/embed/portable?data=...` or `#data=...` — Portable embed payload. New links keep data in the fragment; legacy query links remain supported.
 
 ## Embed Example (SDK v2)
 
@@ -108,7 +108,7 @@ npm run bench:server # Run local Chromium benchmark server
 - `options.lockedTemplate`: lock render template to `minimal` or `compact`.
 - `options.disableImport`: pass host policy metadata.
 - `options.disableDownload`: force hide builder CTA.
-- `options.eventTargetOrigin`: explicit `postMessage` target origin.
+- `options.eventTargetOrigin`: explicit `postMessage` target origin. The SDK defaults to the host page origin.
 - `theme.fontScale`: scale resume typography (0.9 - 1.25).
 - `theme.radius`: host border radius token (4 - 14).
 
@@ -145,9 +145,9 @@ All options live in the Format panel (and section visibility/order also in the n
 | Line Height | Tight / Normal / Relaxed | All outputs |
 | Headings | Uppercase + Rule / Bold Titles / Minimal | All outputs |
 | Bullets | Dot / Dash | All outputs |
-| Dates | Range / Compact / Short / Numeric / ISO | All outputs |
-| Template | Minimal / Compact | All outputs |
-| Header Align | Center / Left | All outputs |
+| Dates | Range / Compact / Short / Numeric / ISO | All outputs; Short uses two-digit years |
+| Template | Minimal / Compact | Preview layout. PDF and DOCX use the ATS-friendly single-column layout. |
+| Header Align | Center / Left | Preview and PDF/DOCX output |
 | Density | Comfortable / Compact / Relaxed | Spacing scale in preview/PDF; DOCX uses line-height equivalent |
 | Link Display | Short label / Full URL | Header links in all outputs |
 | Visibility & Order | Per-section toggle + ↑↓ reorder | Form, nav, preview, and exports share one source of truth |
@@ -160,7 +160,7 @@ npm run test:e2e    # Playwright tests across desktop-chromium and mobile-chromi
 npm run test        # Both suites
 ```
 
-E2E coverage includes builder QoL flows (readiness pill, mobile Edit/Preview toggle, tap-to-open popovers, organize-sheet visibility sync), PDF engine lazy loading per device class, and export menu behavior. CI runs lint, build, unit, and e2e on every push to `main` and on pull requests (`.github/workflows/ci.yml`).
+E2E coverage includes builder QoL flows, mobile view and import behavior, focus visibility, narrow-viewport reflow, production-safe embed payloads, SDK execution and lifecycle, PDF engine lazy loading per device class, and export menu behavior. CI runs lint, build, unit, and e2e on every push to `main` and on pull requests (`.github/workflows/ci.yml`).
 
 Manual checklists live in `docs/ux-qa-matrix.md`.
 
