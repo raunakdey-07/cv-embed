@@ -3,18 +3,18 @@ import {
   hasAccomplishmentItem,
   hasActivityItem,
   hasCertificationItem,
-  hasContent,
   hasEducationItem,
   hasExperienceItem,
   hasProjectItem,
   hasPublicationItem,
-  hasSkills,
-  hasText,
   hasVolunteeringItem,
+  getOrderedSectionIds,
+  isSectionVisible,
+  sectionHasContent,
 } from '../../lib/contentChecks'
 import { getSafeExternalUrl } from '../../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../../lib/utils'
-import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../../types/resume'
+import type { Resume, ResumeSectionKey } from '../../types/resume'
 
 interface MinimalTemplateProps {
   resume: Resume
@@ -27,26 +27,24 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
   const bulletPrefix = options.bulletStyle === 'dash' ? '—' : '•'
 
   const sectionClassName = `resume-template density-${densityMode} header-${options.headerAlignment ?? 'center'} heading-${options.sectionHeadingStyle} font-${options.fontFamily} text-${options.fontSize} line-${options.lineHeight}`
-  const sectionOrder = [...new Set([...(options.sectionOrder ?? []), ...DEFAULT_SECTION_ORDER])]
+  const sectionOrder = getOrderedSectionIds(resume)
 
   const linkText = (label: string, url: string) => (options.linkDisplay === 'url' ? url : label || url)
   const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)
 
-  const shouldRender = (sectionId: ResumeSectionKey, hasContentForSection: boolean) => {
-    return options.showSections[sectionId] && hasContentForSection
-  }
+  const shouldRender = (sectionId: ResumeSectionKey) => isSectionVisible(resume, sectionId) && sectionHasContent(resume, sectionId)
 
   const renderSection = (sectionId: ResumeSectionKey) => {
     switch (sectionId) {
       case 'summary':
-        return shouldRender('summary', hasText(resume.basics.summary)) ? (
+        return shouldRender('summary') ? (
           <section key="summary">
             <h2>Summary</h2>
             <p>{resume.basics.summary}</p>
           </section>
         ) : null
       case 'education':
-        return shouldRender('education', hasContent(resume.education)) ? (
+        return shouldRender('education') ? (
           <section key="education">
             <h2>Education</h2>
             {resume.education.filter(hasEducationItem).map((item, index) => (
@@ -65,7 +63,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'experience':
-        return shouldRender('experience', hasContent(resume.experience)) ? (
+        return shouldRender('experience') ? (
           <section key="experience">
             <h2>Experience</h2>
             {resume.experience.filter(hasExperienceItem).map((item, index) => (
@@ -87,7 +85,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'projects':
-        return shouldRender('projects', hasContent(resume.projects)) ? (
+        return shouldRender('projects') ? (
           <section key="projects">
             <h2>Projects</h2>
             {resume.projects.filter(hasProjectItem).map((item, index) => (
@@ -109,7 +107,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'skills':
-        return shouldRender('skills', hasSkills(resume.skills)) ? (
+        return shouldRender('skills') ? (
           <section key="skills">
             <h2>Skills</h2>
             <div className="resume-skill-grid">
@@ -121,7 +119,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'certifications':
-        return shouldRender('certifications', hasContent(resume.certifications)) ? (
+        return shouldRender('certifications') ? (
           <section key="certifications">
             <h2>Certifications</h2>
             <ul>
@@ -136,7 +134,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'accomplishments':
-        return shouldRender('accomplishments', hasContent(resume.accomplishments)) ? (
+        return shouldRender('accomplishments') ? (
           <section key="accomplishments">
             <h2>Accomplishments</h2>
             {resume.accomplishments.filter(hasAccomplishmentItem).map((item, index) => (
@@ -156,7 +154,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'activities':
-        return shouldRender('activities', hasContent(resume.activities)) ? (
+        return shouldRender('activities') ? (
           <section key="activities">
             <h2>Extra-curricular Activities</h2>
             {resume.activities.filter(hasActivityItem).map((item, index) => (
@@ -176,7 +174,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'volunteering':
-        return shouldRender('volunteering', hasContent(resume.volunteering)) ? (
+        return shouldRender('volunteering') ? (
           <section key="volunteering">
             <h2>Volunteering</h2>
             {resume.volunteering.filter(hasVolunteeringItem).map((item, index) => (
@@ -196,7 +194,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           </section>
         ) : null
       case 'publications':
-        return shouldRender('publications', hasContent(resume.publications)) ? (
+        return shouldRender('publications') ? (
           <section key="publications">
             <h2>Publications</h2>
             {resume.publications.filter(hasPublicationItem).map((item, index) => (

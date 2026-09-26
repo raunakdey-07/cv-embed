@@ -13,18 +13,18 @@ import {
   hasAccomplishmentItem,
   hasActivityItem,
   hasCertificationItem,
-  hasContent,
   hasEducationItem,
   hasExperienceItem,
   hasProjectItem,
   hasPublicationItem,
-  hasSkills,
-  hasText,
   hasVolunteeringItem,
+  getOrderedSectionIds,
+  isSectionVisible,
+  sectionHasContent,
 } from '../lib/contentChecks'
 import { getSafeExternalUrl } from '../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../lib/utils'
-import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../types/resume'
+import type { Resume, ResumeSectionKey } from '../types/resume'
 
 function toDocxFontFamily(fontFamily: Resume['meta']['documentOptions']['fontFamily']): string {
   if (fontFamily === 'times' || fontFamily === 'instrumentserif') {
@@ -169,21 +169,19 @@ function renderSections(resume: Resume): Paragraph[] {
   const options = resume.meta.documentOptions
   const dateValue = (startDate: string, endDate: string) => formatDateRangeByStyle(startDate, endDate, options.dateStyle)
   const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)
-  const sectionOrder = [...new Set([...(options.sectionOrder ?? []), ...DEFAULT_SECTION_ORDER])]
+  const sectionOrder = getOrderedSectionIds(resume)
 
-  const shouldRender = (sectionId: ResumeSectionKey, hasContentForSection: boolean) => {
-    return options.showSections[sectionId] && hasContentForSection
-  }
+  const shouldRender = (sectionId: ResumeSectionKey) => isSectionVisible(resume, sectionId) && sectionHasContent(resume, sectionId)
 
   const paragraphs: Paragraph[] = []
 
   for (const sectionId of sectionOrder) {
-    if (sectionId === 'summary' && shouldRender('summary', hasText(resume.basics.summary))) {
+    if (sectionId === 'summary' && shouldRender('summary')) {
       paragraphs.push(sectionTitleParagraph('Summary', resume), bodyParagraph(resume.basics.summary, resume))
       continue
     }
 
-    if (sectionId === 'education' && shouldRender('education', hasContent(resume.education))) {
+    if (sectionId === 'education' && shouldRender('education')) {
       paragraphs.push(sectionTitleParagraph('Education', resume))
       for (const item of resume.education.filter(hasEducationItem)) {
         paragraphs.push(rowParagraph(item.institution, dateValue(item.startDate, item.endDate), resume))
@@ -194,7 +192,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'experience' && shouldRender('experience', hasContent(resume.experience))) {
+    if (sectionId === 'experience' && shouldRender('experience')) {
       paragraphs.push(sectionTitleParagraph('Experience', resume))
       for (const item of resume.experience.filter(hasExperienceItem)) {
         paragraphs.push(rowParagraph(`${item.role}${item.company ? `, ${item.company}` : ''}`, dateValue(item.startDate, item.endDate), resume))
@@ -206,7 +204,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'projects' && shouldRender('projects', hasContent(resume.projects))) {
+    if (sectionId === 'projects' && shouldRender('projects')) {
       paragraphs.push(sectionTitleParagraph('Projects', resume))
       for (const item of resume.projects.filter(hasProjectItem)) {
         paragraphs.push(rowParagraph(item.title, dateValue(item.startDate, item.endDate), resume))
@@ -220,7 +218,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'skills' && shouldRender('skills', hasSkills(resume.skills))) {
+    if (sectionId === 'skills' && shouldRender('skills')) {
       paragraphs.push(sectionTitleParagraph('Skills', resume))
       if (resume.skills.languages.length > 0) paragraphs.push(bodyParagraph(`Languages: ${resume.skills.languages.join(', ')}`, resume))
       if (resume.skills.frameworks.length > 0) paragraphs.push(bodyParagraph(`Frameworks: ${resume.skills.frameworks.join(', ')}`, resume))
@@ -229,7 +227,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'certifications' && shouldRender('certifications', hasContent(resume.certifications))) {
+    if (sectionId === 'certifications' && shouldRender('certifications')) {
       paragraphs.push(sectionTitleParagraph('Certifications', resume))
       for (const item of resume.certifications.filter(hasCertificationItem)) {
         const date = singleDate(item.date)
@@ -243,7 +241,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'accomplishments' && shouldRender('accomplishments', hasContent(resume.accomplishments))) {
+    if (sectionId === 'accomplishments' && shouldRender('accomplishments')) {
       paragraphs.push(sectionTitleParagraph('Accomplishments', resume))
       for (const item of resume.accomplishments.filter(hasAccomplishmentItem)) {
         paragraphs.push(rowParagraph(item.title, dateValue(item.startDate, item.endDate), resume))
@@ -256,7 +254,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'activities' && shouldRender('activities', hasContent(resume.activities))) {
+    if (sectionId === 'activities' && shouldRender('activities')) {
       paragraphs.push(sectionTitleParagraph('Extra-curricular Activities', resume))
       for (const item of resume.activities.filter(hasActivityItem)) {
         paragraphs.push(rowParagraph(`${item.role}${item.organization ? `, ${item.organization}` : ''}`, dateValue(item.startDate, item.endDate), resume))
@@ -268,7 +266,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'volunteering' && shouldRender('volunteering', hasContent(resume.volunteering))) {
+    if (sectionId === 'volunteering' && shouldRender('volunteering')) {
       paragraphs.push(sectionTitleParagraph('Volunteering', resume))
       for (const item of resume.volunteering.filter(hasVolunteeringItem)) {
         paragraphs.push(rowParagraph(`${item.role}${item.organization ? `, ${item.organization}` : ''}`, dateValue(item.startDate, item.endDate), resume))
@@ -280,7 +278,7 @@ function renderSections(resume: Resume): Paragraph[] {
       continue
     }
 
-    if (sectionId === 'publications' && shouldRender('publications', hasContent(resume.publications))) {
+    if (sectionId === 'publications' && shouldRender('publications')) {
       paragraphs.push(sectionTitleParagraph('Publications', resume))
       for (const item of resume.publications.filter(hasPublicationItem)) {
         paragraphs.push(rowParagraph(item.title, singleDate(item.date), resume))

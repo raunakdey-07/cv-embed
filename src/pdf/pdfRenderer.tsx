@@ -11,19 +11,20 @@ import {
   hasAccomplishmentItem,
   hasActivityItem,
   hasCertificationItem,
-  hasContent,
   hasEducationItem,
   hasExperienceItem,
   hasProjectItem,
   hasPublicationItem,
-  hasSkills,
-  hasText,
   hasVolunteeringItem,
+  getOrderedSectionIds,
+  getRenderableSectionIds,
+  isSectionVisible,
+  sectionHasContent,
 } from '../lib/contentChecks'
 import { assertPdfTextSupported } from '../lib/pdfText'
 import { getSafeExternalUrl } from '../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../lib/utils'
-import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../types/resume'
+import type { Resume, ResumeSectionKey } from '../types/resume'
 
 function getPdfStyleConfig(resume: Resume) {
   const options = resume.meta.documentOptions
@@ -134,23 +135,21 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
   const dateValue = (startDate: string, endDate: string) => formatDateRangeByStyle(startDate, endDate, options.dateStyle)
   const singleDate = (value: string) => formatSingleDate(value, options.dateStyle)
   const linkValue = (label: string, url: string) => (options.linkDisplay === 'url' ? url : label || url)
-  const sectionOrder = [...new Set([...(options.sectionOrder ?? []), ...DEFAULT_SECTION_ORDER])]
+  const sectionOrder = getOrderedSectionIds(resume)
 
-  const shouldRender = (sectionId: ResumeSectionKey, hasContentForSection: boolean) => {
-    return options.showSections[sectionId] && hasContentForSection
-  }
+  const shouldRender = (sectionId: ResumeSectionKey) => isSectionVisible(resume, sectionId) && sectionHasContent(resume, sectionId)
 
   const renderSection = (sectionId: ResumeSectionKey) => {
     switch (sectionId) {
       case 'summary':
-        return shouldRender('summary', hasText(resume.basics.summary)) ? (
+        return shouldRender('summary') ? (
           <View style={styles.section} key="summary">
             <Text style={styles.sectionTitle}>Summary</Text>
             <Text>{resume.basics.summary}</Text>
           </View>
         ) : null
       case 'education':
-        return shouldRender('education', hasContent(resume.education)) ? (
+        return shouldRender('education') ? (
           <View style={styles.section} key="education">
             <Text style={styles.sectionTitle}>Education</Text>
             {resume.education.filter(hasEducationItem).map((item, index) => (
@@ -166,7 +165,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'experience':
-        return shouldRender('experience', hasContent(resume.experience)) ? (
+        return shouldRender('experience') ? (
           <View style={styles.section} key="experience">
             <Text style={styles.sectionTitle}>Experience</Text>
             {resume.experience.filter(hasExperienceItem).map((item, index) => (
@@ -184,7 +183,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'projects':
-        return shouldRender('projects', hasContent(resume.projects)) ? (
+        return shouldRender('projects') ? (
           <View style={styles.section} key="projects">
             <Text style={styles.sectionTitle}>Projects</Text>
             {resume.projects.filter(hasProjectItem).map((item, index) => {
@@ -208,7 +207,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'skills':
-        return shouldRender('skills', hasSkills(resume.skills)) ? (
+        return shouldRender('skills') ? (
           <View style={styles.section} key="skills">
             <Text style={styles.sectionTitle}>Skills</Text>
             {resume.skills.languages.length > 0 ? <Text style={styles.sectionText}>Languages: {resume.skills.languages.join(', ')}</Text> : null}
@@ -218,7 +217,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'certifications':
-        return shouldRender('certifications', hasContent(resume.certifications)) ? (
+        return shouldRender('certifications') ? (
           <View style={styles.section} key="certifications">
             <Text style={styles.sectionTitle}>Certifications</Text>
             {resume.certifications.filter(hasCertificationItem).map((item, index) => {
@@ -236,7 +235,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'accomplishments':
-        return shouldRender('accomplishments', hasContent(resume.accomplishments)) ? (
+        return shouldRender('accomplishments') ? (
           <View style={styles.section} key="accomplishments">
             <Text style={styles.sectionTitle}>Accomplishments</Text>
             {resume.accomplishments.filter(hasAccomplishmentItem).map((item, index) => (
@@ -254,7 +253,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'activities':
-        return shouldRender('activities', hasContent(resume.activities)) ? (
+        return shouldRender('activities') ? (
           <View style={styles.section} key="activities">
             <Text style={styles.sectionTitle}>Extra-curricular Activities</Text>
             {resume.activities.filter(hasActivityItem).map((item, index) => {
@@ -273,7 +272,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'volunteering':
-        return shouldRender('volunteering', hasContent(resume.volunteering)) ? (
+        return shouldRender('volunteering') ? (
           <View style={styles.section} key="volunteering">
             <Text style={styles.sectionTitle}>Volunteering</Text>
             {resume.volunteering.filter(hasVolunteeringItem).map((item, index) => (
@@ -291,7 +290,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           </View>
         ) : null
       case 'publications':
-        return shouldRender('publications', hasContent(resume.publications)) ? (
+        return shouldRender('publications') ? (
           <View style={styles.section} key="publications">
             <Text style={styles.sectionTitle}>Publications</Text>
             {resume.publications.filter(hasPublicationItem).map((item, index) => {
@@ -374,22 +373,21 @@ export interface PdfEngineComparison {
   deltaP50Ms?: number
 }
 
+const PDF_SECTION_HEADINGS: Record<ResumeSectionKey, string> = {
+  summary: 'Summary',
+  education: 'Education',
+  experience: 'Experience',
+  projects: 'Projects',
+  skills: 'Skills',
+  certifications: 'Certifications',
+  accomplishments: 'Accomplishments',
+  activities: 'Extra-curricular Activities',
+  volunteering: 'Volunteering',
+  publications: 'Publications',
+}
+
 function expectedSectionHeadings(resume: Resume): string[] {
-  const options = resume.meta.documentOptions
-  const headings: string[] = []
-
-  if (options.showSections.summary && hasText(resume.basics.summary)) headings.push('Summary')
-  if (options.showSections.education && hasContent(resume.education)) headings.push('Education')
-  if (options.showSections.experience && hasContent(resume.experience)) headings.push('Experience')
-  if (options.showSections.projects && hasContent(resume.projects)) headings.push('Projects')
-  if (options.showSections.skills && hasSkills(resume.skills)) headings.push('Skills')
-  if (options.showSections.certifications && hasContent(resume.certifications)) headings.push('Certifications')
-  if (options.showSections.accomplishments && hasContent(resume.accomplishments)) headings.push('Accomplishments')
-  if (options.showSections.activities && hasContent(resume.activities)) headings.push('Extra-curricular Activities')
-  if (options.showSections.volunteering && hasContent(resume.volunteering)) headings.push('Volunteering')
-  if (options.showSections.publications && hasContent(resume.publications)) headings.push('Publications')
-
-  return headings
+  return getRenderableSectionIds(resume).map((sectionId) => PDF_SECTION_HEADINGS[sectionId])
 }
 
 export async function benchmarkReactPdfEngine(resume: Resume, iterations = 3): Promise<PdfBenchmarkStats> {

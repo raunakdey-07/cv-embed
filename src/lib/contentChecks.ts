@@ -1,4 +1,4 @@
-import type { Resume } from '../types/resume'
+import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../types/resume'
 
 // Shared "does this section have any usable content?" predicates used by the
 // HTML templates (Minimal/Compact) and the PDF/DOCX renderers so every output
@@ -19,7 +19,7 @@ export function hasContent<T extends object>(items: T[]): boolean {
 }
 
 export function hasSkills(skills: Resume['skills']): boolean {
-  return skills.languages.length > 0 || skills.frameworks.length > 0 || skills.tools.length > 0 || skills.other.length > 0
+  return [...skills.languages, ...skills.frameworks, ...skills.tools, ...skills.other].some(hasText)
 }
 
 export const hasEducationItem = (item: Resume['education'][number]) =>
@@ -47,3 +47,42 @@ export const hasVolunteeringItem = (item: Resume['volunteering'][number]) =>
 
 export const hasPublicationItem = (item: Resume['publications'][number]) =>
   [item.title, item.venue, item.date, item.url].some(hasText)
+
+export function getOrderedSectionIds(resume: Resume): ResumeSectionKey[] {
+  return [...new Set([...resume.meta.documentOptions.sectionOrder, ...DEFAULT_SECTION_ORDER])]
+}
+
+export function isSectionVisible(resume: Resume, sectionId: ResumeSectionKey): boolean {
+  return resume.meta.documentOptions.showSections[sectionId]
+}
+
+export function sectionHasContent(resume: Resume, sectionId: ResumeSectionKey): boolean {
+  switch (sectionId) {
+    case 'summary':
+      return hasText(resume.basics.summary)
+    case 'education':
+      return resume.education.some(hasEducationItem)
+    case 'experience':
+      return resume.experience.some(hasExperienceItem)
+    case 'projects':
+      return resume.projects.some(hasProjectItem)
+    case 'skills':
+      return hasSkills(resume.skills)
+    case 'certifications':
+      return resume.certifications.some(hasCertificationItem)
+    case 'accomplishments':
+      return resume.accomplishments.some(hasAccomplishmentItem)
+    case 'activities':
+      return resume.activities.some(hasActivityItem)
+    case 'volunteering':
+      return resume.volunteering.some(hasVolunteeringItem)
+    case 'publications':
+      return resume.publications.some(hasPublicationItem)
+  }
+}
+
+export function getRenderableSectionIds(resume: Resume): ResumeSectionKey[] {
+  return getOrderedSectionIds(resume).filter((sectionId) =>
+    isSectionVisible(resume, sectionId) && sectionHasContent(resume, sectionId),
+  )
+}

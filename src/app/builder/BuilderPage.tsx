@@ -19,7 +19,7 @@ import {
   IconSliders, IconTrophy, IconUpload, IconUser, IconZap,
 } from '../../components/ui/Icons'
 import { createDownloadFileName, createPortableResumeUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl, MAX_PORTABLE_PAYLOAD_CHARS, normalizeResume, withUpdatedTimestamp } from '../../lib/utils'
-import { DEFAULT_SECTION_ORDER } from '../../types/resume'
+import { getOrderedSectionIds } from '../../lib/contentChecks'
 import { loadDraft, loadPublicBaseUrl, saveDraft, savePublicBaseUrl } from '../../lib/storage'
 import { resolveNextActionSection, type BuilderSectionId } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
@@ -814,7 +814,7 @@ export function BuilderPage() {
   // Form panels follow sectionOrder so editing order matches nav/preview/export.
   const orderedFormSections = useMemo(() => {
     const options = resume.meta.documentOptions
-    const order = options.sectionOrder.length > 0 ? options.sectionOrder : DEFAULT_SECTION_ORDER
+    const order = getOrderedSectionIds(resume)
 
     const nodes: Partial<Record<ResumeSectionKey, React.ReactNode>> = {
       education: <EducationSection education={resume.education} onChange={(education) => setResume((p) => ({ ...p, education }))} />,
