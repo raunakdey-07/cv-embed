@@ -15,10 +15,10 @@ export function DocumentOptionsSection({ options, template, onTemplateChange, on
   return (
     <section className="panel format-panel">
       <div className="field-grid">
-        <label>Template
+        <label>Preview template
           <select value={template} onChange={(e) => onTemplateChange(e.target.value as TemplateName)}>
-            <option value="minimal">Minimal — classic single column</option>
-            <option value="compact">Compact — two-column grid</option>
+            <option value="minimal">Minimal: single column</option>
+            <option value="compact">Compact: two-column preview</option>
           </select>
         </label>
         <label>Header Alignment
@@ -69,7 +69,7 @@ export function DocumentOptionsSection({ options, template, onTemplateChange, on
           <select value={options.dateStyle} onChange={(e) => update('dateStyle', e.target.value as DocumentOptions['dateStyle'])}>
             <option value="range">Jun 2024 - Aug 2025</option>
             <option value="compact">Jun 2024–Aug 2025</option>
-            <option value="short">Jun 2024 – Aug 2025 (month first)</option>
+            <option value="short">Jun 24 – Aug 25 (short year)</option>
             <option value="numeric">06/2024 – 08/2025</option>
             <option value="iso">2024-06 – 2025-08</option>
           </select>
@@ -82,6 +82,7 @@ export function DocumentOptionsSection({ options, template, onTemplateChange, on
           </select>
         </label>
       </div>
+      <p className="field-help">Compact changes the live preview. PDF and DOCX use the ATS-friendly single-column layout.</p>
     </section>
   )
 }

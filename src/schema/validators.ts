@@ -1,5 +1,6 @@
 import { clampScore } from '../lib/scoring'
-import type { Resume, ValidationResult } from '../types/resume'
+import { getSafeExternalUrl } from '../lib/url'
+import type { Resume, ResumeSectionKey, ValidationResult } from '../types/resume'
 import { resumeSchema } from './resumeSchema'
 
 const MAX_EXPERIENCE_BULLETS = 4
@@ -12,14 +13,13 @@ function isBlank(value: string): boolean {
   return value.trim().length === 0
 }
 
-function pushMissingField(errors: string[], section: string, field: string, value: string) {
-  if (isBlank(value)) {
-    errors.push(`${section}.${field} is required`)
-  }
-}
 
 function hasAnyText(values: string[]): boolean {
   return values.some((value) => !isBlank(value))
+}
+
+function isVisible(resume: Resume, section: ResumeSectionKey): boolean {
+  return resume.meta.documentOptions.showSections[section]
 }
 
 function dedupeAndFindDuplicates(skills: string[]): string[] {
@@ -28,30 +28,18 @@ function dedupeAndFindDuplicates(skills: string[]): string[] {
 
   for (const skill of skills) {
     const normalized = skill.trim().toLowerCase()
-    if (!normalized) {
-      continue
-    }
-
-    if (seen.has(normalized)) {
-      duplicates.add(skill.trim())
-    } else {
-      seen.add(normalized)
-    }
+    if (!normalized) continue
+    if (seen.has(normalized)) duplicates.add(skill.trim())
+    else seen.add(normalized)
   }
 
   return [...duplicates]
 }
 
-function calculateQualityScore(errors: string[], warnings: string[], resume: Resume): number {
-  const errorPenalty = Math.min(errors.length * 8, 64)
-  const warningPenalty = Math.min(warnings.length * 2, 20)
-  const qualityBonus =
-    (resume.basics.summary.trim() ? 2 : 0) +
-    (resume.basics.links.some((link) => !isBlank(link.url)) ? 1 : 0) +
-    (resume.projects.length >= 2 ? 2 : 0) +
-    (resume.experience.length >= 1 ? 1 : 0)
-
-  return clampScore(100 - errorPenalty - warningPenalty + qualityBonus)
+function validateUrlField(value: string, path: string, warnings: string[]): void {
+  if (value && !getSafeExternalUrl(value)) {
+    warnings.push(`${path} must be a complete http:// or https:// URL`)
+  }
 }
 
 function calculateCompletenessScore(resume: Resume): number {
@@ -62,20 +50,55 @@ function calculateCompletenessScore(resume: Resume): number {
     ...resume.skills.tools,
     ...resume.skills.other,
   ].map((skill) => skill.trim().toLowerCase()).filter(Boolean))]
+  const hasEducation = resume.education.some((item) => hasAnyText([
+    item.institution,
+    item.degree,
+    item.field,
+    item.cgpa,
+    item.startDate,
+    item.endDate,
+    item.location,
+  ]))
+  const hasExperience = resume.experience.some((item) => hasAnyText([
+    item.company,
+    item.role,
+    item.location,
+    item.startDate,
+    item.endDate,
+    ...item.bullets,
+  ]))
+  const hasProjects = resume.projects.some((item) => hasAnyText([
+    item.title,
+    item.projectLink,
+    item.repoLink,
+    ...item.techStack,
+    item.startDate,
+    item.endDate,
+    ...item.bullets,
+  ]))
 
   const checks = [
     hasText(resume.basics.name),
-    hasText(resume.basics.email),
-    hasText(resume.basics.phone),
-    resume.education.length > 0,
-    resume.experience.length > 0 || resume.projects.length > 0,
-    uniqueSkills.length >= 3,
-    resume.accomplishments.length > 0,
-    hasText(resume.basics.summary),
-    resume.basics.links.some((link) => hasText(link.url)),
+    hasText(resume.basics.email) || hasText(resume.basics.phone),
+    !isVisible(resume, 'summary') || hasText(resume.basics.summary),
+    !isVisible(resume, 'education') || hasEducation,
+    !isVisible(resume, 'experience') && !isVisible(resume, 'projects') || hasExperience || hasProjects,
+    !isVisible(resume, 'skills') || uniqueSkills.length >= 3,
+    resume.basics.links.some((link) => Boolean(getSafeExternalUrl(link.url))),
   ]
 
   return clampScore(Math.round((checks.filter(Boolean).length / checks.length) * 100))
+}
+
+function emptyResult(errors: string[], warnings: string[]): ValidationResult {
+  return {
+    valid: false,
+    warnings,
+    errors,
+    qualityScore: 0,
+    completenessScore: 0,
+    score: 0,
+  }
 }
 
 export function validateResume(resume: Resume): ValidationResult {
@@ -88,117 +111,91 @@ export function validateResume(resume: Resume): ValidationResult {
       const path = issue.path.join('.')
       errors.push(`${path}: ${issue.message}`)
     }
+    return emptyResult(errors, warnings)
   }
 
-  pushMissingField(errors, 'basics', 'name', resume.basics.name)
-  pushMissingField(errors, 'basics', 'email', resume.basics.email)
-  pushMissingField(errors, 'basics', 'phone', resume.basics.phone)
-
-  if (resume.education.length === 0) {
-    errors.push('education must contain at least one entry')
+  if (isBlank(resume.basics.name)) {
+    errors.push('basics.name is required')
+  }
+  if (isBlank(resume.basics.email) && isBlank(resume.basics.phone)) {
+    errors.push('basics requires an email address or phone number')
+  }
+  if (!isBlank(resume.basics.email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resume.basics.email.trim())) {
+    warnings.push('basics.email should use a valid email address')
   }
 
-  resume.education.forEach((item, index) => {
-    pushMissingField(errors, `education[${index}]`, 'institution', item.institution)
-    pushMissingField(errors, `education[${index}]`, 'degree', item.degree)
-    pushMissingField(errors, `education[${index}]`, 'field', item.field)
-  })
-
-  resume.experience.forEach((item, index) => {
-    if (item.bullets.length > MAX_EXPERIENCE_BULLETS) {
-      errors.push(`experience[${index}] has more than ${MAX_EXPERIENCE_BULLETS} bullets`)
-    }
-
-    item.bullets.forEach((bullet, bulletIndex) => {
-      if (bullet.length > MAX_BULLET_CHARS) {
-        errors.push(
-          `experience[${index}].bullets[${bulletIndex}] exceeds ${MAX_BULLET_CHARS} characters`,
-        )
-      }
-    })
-  })
-
-  resume.projects.forEach((item, index) => {
-    if (item.bullets.length > MAX_PROJECT_BULLETS) {
-      errors.push(`projects[${index}] has more than ${MAX_PROJECT_BULLETS} bullets`)
-    }
-
-    item.bullets.forEach((bullet, bulletIndex) => {
-      if (bullet.length > MAX_BULLET_CHARS) {
-        errors.push(`projects[${index}].bullets[${bulletIndex}] exceeds ${MAX_BULLET_CHARS} characters`)
-      }
-    })
-
-    if (item.projectLink && !item.projectLink.startsWith('http')) {
-      warnings.push(`projects[${index}].projectLink should start with http or https`)
-    }
-
-    if (item.repoLink && !item.repoLink.startsWith('http')) {
-      warnings.push(`projects[${index}].repoLink should start with http or https`)
-    }
-  })
-
-  resume.certifications.forEach((item, index) => {
-    if (item.credentialUrl && !item.credentialUrl.startsWith('http')) {
-      warnings.push(`certifications[${index}].credentialUrl should start with http or https`)
-    }
-  })
-
-  resume.accomplishments.forEach((item, index) => {
-    if (item.bullets.length > MAX_ACCOMPLISHMENT_BULLETS) {
-      errors.push(`accomplishments[${index}] has more than ${MAX_ACCOMPLISHMENT_BULLETS} bullets`)
-    }
-
-    item.bullets.forEach((bullet, bulletIndex) => {
-      if (bullet.length > MAX_BULLET_CHARS) {
-        errors.push(`accomplishments[${index}].bullets[${bulletIndex}] exceeds ${MAX_BULLET_CHARS} characters`)
-      }
-    })
-  })
-
-  resume.activities.forEach((item, index) => {
-    if (item.referenceUrl && !item.referenceUrl.startsWith('http')) {
-      warnings.push(`activities[${index}].referenceUrl should start with http or https`)
-    }
-  })
-
-  resume.volunteering.forEach((item, index) => {
-    if (item.bullets.length > MAX_VOLUNTEERING_BULLETS) {
-      errors.push(`volunteering[${index}] has more than ${MAX_VOLUNTEERING_BULLETS} bullets`)
-    }
-
-    item.bullets.forEach((bullet, bulletIndex) => {
-      if (bullet.length > MAX_BULLET_CHARS) {
-        errors.push(`volunteering[${index}].bullets[${bulletIndex}] exceeds ${MAX_BULLET_CHARS} characters`)
-      }
-    })
-  })
-
-  resume.publications.forEach((item, index) => {
-    if (item.url && !item.url.startsWith('http')) {
-      warnings.push(`publications[${index}].url should start with http or https`)
-    }
-  })
-
-  const meaningfulProjects = resume.projects.filter((item) =>
-    hasAnyText([item.title, item.startDate, item.endDate, item.projectLink, item.repoLink]) ||
-    item.techStack.some((tech) => !isBlank(tech)) ||
-    item.bullets.some((bullet) => !isBlank(bullet)),
-  )
-
-  const meaningfulExperience = resume.experience.filter((item) =>
-    hasAnyText([item.company, item.role, item.location, item.startDate, item.endDate]) ||
-    item.bullets.some((bullet) => !isBlank(bullet)),
-  )
-
-  if (meaningfulProjects.length === 0) {
-    errors.push('At least one project is required')
-  } else if (meaningfulProjects.length === 1) {
-    warnings.push('Adding a second project improves profile depth')
+  if (isVisible(resume, 'summary') && isBlank(resume.basics.summary)) {
+    warnings.push('Adding a concise summary may improve profile strength')
   }
 
-  if (meaningfulExperience.length === 0) {
-    warnings.push('Add at least one experience or internship entry')
+  if (isVisible(resume, 'education')) {
+    const meaningfulEducation = resume.education.some((item) => hasAnyText([
+      item.institution,
+      item.degree,
+      item.field,
+      item.cgpa,
+      item.startDate,
+      item.endDate,
+      item.location,
+    ]))
+    if (!meaningfulEducation) {
+      warnings.push('Add at least one education entry or hide the Education section')
+    }
+    resume.education.forEach((item, index) => {
+      if (isBlank(item.institution)) warnings.push(`education[${index}].institution will appear empty`)
+      if (isBlank(item.degree)) warnings.push(`education[${index}].degree will appear empty`)
+    })
+  }
+
+  if (isVisible(resume, 'experience')) {
+    resume.experience.forEach((item, index) => {
+      if (item.bullets.length > MAX_EXPERIENCE_BULLETS) {
+        warnings.push(`experience[${index}] has more than ${MAX_EXPERIENCE_BULLETS} bullets`)
+      }
+      item.bullets.forEach((bullet, bulletIndex) => {
+        if (bullet.length > MAX_BULLET_CHARS) {
+          warnings.push(`experience[${index}].bullets[${bulletIndex}] is longer than ${MAX_BULLET_CHARS} characters`)
+        }
+      })
+    })
+  }
+
+  if (isVisible(resume, 'projects')) {
+    resume.projects.forEach((item, index) => {
+      if (item.bullets.length > MAX_PROJECT_BULLETS) {
+        warnings.push(`projects[${index}] has more than ${MAX_PROJECT_BULLETS} bullets`)
+      }
+      item.bullets.forEach((bullet, bulletIndex) => {
+        if (bullet.length > MAX_BULLET_CHARS) {
+          warnings.push(`projects[${index}].bullets[${bulletIndex}] is longer than ${MAX_BULLET_CHARS} characters`)
+        }
+      })
+      validateUrlField(item.projectLink, `projects[${index}].projectLink`, warnings)
+      validateUrlField(item.repoLink, `projects[${index}].repoLink`, warnings)
+    })
+  }
+
+  if (isVisible(resume, 'experience') || isVisible(resume, 'projects')) {
+    const hasExperience = resume.experience.some((item) => hasAnyText([
+      item.company,
+      item.role,
+      item.location,
+      item.startDate,
+      item.endDate,
+      ...item.bullets,
+    ]))
+    const hasProjects = resume.projects.some((item) => hasAnyText([
+      item.title,
+      item.projectLink,
+      item.repoLink,
+      ...item.techStack,
+      item.startDate,
+      item.endDate,
+      ...item.bullets,
+    ]))
+    if (!hasExperience && !hasProjects) {
+      warnings.push('Add at least one experience or project entry, or hide those sections')
+    }
   }
 
   const allSkills = [
@@ -207,31 +204,72 @@ export function validateResume(resume: Resume): ValidationResult {
     ...resume.skills.tools,
     ...resume.skills.other,
   ]
-
   const uniqueSkills = [...new Set(allSkills.map((skill) => skill.trim().toLowerCase()).filter(Boolean))]
-
   const duplicateSkills = dedupeAndFindDuplicates(allSkills)
   if (duplicateSkills.length > 0) {
     warnings.push(`Duplicate skills detected: ${duplicateSkills.join(', ')}`)
   }
+  if (isVisible(resume, 'skills') && uniqueSkills.length < 3) {
+    warnings.push('Add at least 3 distinct skills for a more complete Skills section')
+  }
+
+  if (isVisible(resume, 'certifications')) {
+    resume.certifications.forEach((item, index) => {
+      validateUrlField(item.credentialUrl, `certifications[${index}].credentialUrl`, warnings)
+    })
+  }
+  if (isVisible(resume, 'accomplishments')) {
+    resume.accomplishments.forEach((item, index) => {
+      if (item.bullets.length > MAX_ACCOMPLISHMENT_BULLETS) {
+        warnings.push(`accomplishments[${index}] has more than ${MAX_ACCOMPLISHMENT_BULLETS} bullets`)
+      }
+      item.bullets.forEach((bullet, bulletIndex) => {
+        if (bullet.length > MAX_BULLET_CHARS) {
+          warnings.push(`accomplishments[${index}].bullets[${bulletIndex}] is longer than ${MAX_BULLET_CHARS} characters`)
+        }
+      })
+    })
+  }
+  if (isVisible(resume, 'activities')) {
+    resume.activities.forEach((item, index) => {
+      validateUrlField(item.referenceUrl, `activities[${index}].referenceUrl`, warnings)
+    })
+  }
+  if (isVisible(resume, 'volunteering')) {
+    resume.volunteering.forEach((item, index) => {
+      if (item.bullets.length > MAX_VOLUNTEERING_BULLETS) {
+        warnings.push(`volunteering[${index}] has more than ${MAX_VOLUNTEERING_BULLETS} bullets`)
+      }
+      item.bullets.forEach((bullet, bulletIndex) => {
+        if (bullet.length > MAX_BULLET_CHARS) {
+          warnings.push(`volunteering[${index}].bullets[${bulletIndex}] is longer than ${MAX_BULLET_CHARS} characters`)
+        }
+      })
+    })
+  }
+  if (isVisible(resume, 'publications')) {
+    resume.publications.forEach((item, index) => {
+      validateUrlField(item.url, `publications[${index}].url`, warnings)
+    })
+  }
+
+  resume.basics.links.forEach((link, index) => {
+    validateUrlField(link.url, `basics.links[${index}].url`, warnings)
+  })
 
   const roughLength = JSON.stringify(resume).length
   if (roughLength > 6000) {
-    warnings.push('Resume may overflow one page. Reduce summary or bullet lengths.')
+    warnings.push('Resume may be longer than one page. Check the PDF page estimate before export.')
   }
 
-  if (isBlank(resume.basics.summary)) {
-    warnings.push('Adding a concise summary may improve profile strength.')
-  }
-
-  if (uniqueSkills.length < 3) {
-    errors.push('Add at least 3 distinct skills')
-  } else if (uniqueSkills.length < 6) {
-    warnings.push('Add a few more skills to improve discoverability')
-  }
-
-  const qualityScore = calculateQualityScore(errors, warnings, resume)
+  // The rubric applies error/warning penalties to a content-bearing CV. The
+  // completeness score is also the content coverage gate, so default sections
+  // and formatting alone cannot produce a non-zero quality score.
   const completenessScore = calculateCompletenessScore(resume)
+  const penaltyAdjustedQuality = clampScore(100 - errors.length * 15 - warnings.length * 3)
+  const qualityScore = completenessScore === 0
+    ? 0
+    : clampScore(Math.round(penaltyAdjustedQuality * completenessScore / 100))
   const score = clampScore(Math.round((qualityScore + completenessScore) / 2))
 
   return {

@@ -14,6 +14,8 @@ function Svg({ size = 16, children, ...props }: IconProps & { children: React.Re
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       {...props}
     >
       {children}

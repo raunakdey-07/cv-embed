@@ -53,7 +53,9 @@
     var url = new URL('/embed/' + encodeURIComponent(pathResumeId), baseUrl)
 
     if (hasResumeData) {
-      url.searchParams.set('data', encodeResumeData(options.resumeData))
+      var fragment = new URLSearchParams()
+      fragment.set('data', encodeResumeData(options.resumeData))
+      url.hash = fragment.toString()
     }
 
     if (theme && theme.primaryColor) {
@@ -92,9 +94,7 @@
       url.searchParams.set('lockedTemplate', options.lockedTemplate)
     }
 
-    if (options && options.eventTargetOrigin) {
-      url.searchParams.set('eventOrigin', options.eventTargetOrigin)
-    }
+    url.searchParams.set('eventOrigin', (options && options.eventTargetOrigin) || window.location.origin)
 
     if (theme && typeof theme.fontScale === 'number') {
       url.searchParams.set('fontScale', String(theme.fontScale))
@@ -120,6 +120,8 @@
     return out
   }
 
+  var activeInstances = new WeakMap()
+
   var CVEmbed = {
     render: function render(config) {
       if (!config || !config.target || (!config.resumeId && !config.resumeData)) {
@@ -132,6 +134,9 @@
       }
 
       var baseUrl = config.baseUrl || getDefaultBaseUrl()
+      if (activeInstances.has(target)) {
+        activeInstances.get(target).destroy()
+      }
       var embedId = randomEmbedId()
       var listeners = mergeEvents(config.events)
       var activeConfig = config
@@ -154,8 +159,8 @@
         },
         embedId
       )
-      iframe.width = config.width || '100%'
-      iframe.height = String(config.height || 1100)
+      iframe.width = String(config.width == null ? '100%' : config.width)
+      iframe.height = String(config.height == null ? 1100 : config.height)
       iframe.frameBorder = '0'
       iframe.style.border = '0'
       iframe.setAttribute('loading', 'lazy')
@@ -164,8 +169,9 @@
 
       function onMessage(event) {
         var data = event.data || {}
-        if (event.source !== iframe.contentWindow) return
-        if (data.source !== 'cv-embed' || data.version !== '2' || data.embedId !== embedId) return
+        var expectedOrigin = new URL(activeConfig.baseUrl || getDefaultBaseUrl(), window.location.href).origin
+        if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) return
+        if (data.source !== 'cv-embed' || data.version !== '2' || data.embedId !== embedId || !data.payload || typeof data.payload !== 'object') return
 
         if (listeners.onMessage) listeners.onMessage(data)
         if (data.event === 'ready' && listeners.onReady) listeners.onReady(data.payload)
@@ -175,7 +181,10 @@
         if (data.event === 'heightChange') {
           var height = Number(data.payload && data.payload.height)
           if ((!activeConfig.options || activeConfig.options.autoHeight !== false) && Number.isFinite(height) && height > 0) {
-            iframe.height = String(Math.round(height))
+            var appliedHeight = Math.min(10000, Math.round(height))
+            iframe.height = String(appliedHeight)
+            if (listeners.onHeightChange) listeners.onHeightChange({ height: appliedHeight })
+            return
           }
           if (listeners.onHeightChange) listeners.onHeightChange({ height: height })
         }
@@ -186,9 +195,12 @@
       target.innerHTML = ''
       target.appendChild(iframe)
 
-      return {
+      var instance = {
         destroy: function () {
           window.removeEventListener('message', onMessage)
+          if (activeInstances.get(target) === instance) {
+            activeInstances.delete(target)
+          }
           if (iframe.parentElement === target) {
             target.removeChild(iframe)
           }
@@ -209,13 +221,15 @@
           }
 
           listeners = mergeEvents(listeners, nextConfig.events)
-          iframe.src = buildEmbedUrl(
+          var nextUrl = buildEmbedUrl(
             activeConfig.baseUrl || getDefaultBaseUrl(),
             activeConfig.resumeId,
             activeConfig.theme || {},
             Object.assign({}, activeConfig.options || {}, { resumeData: activeConfig.resumeData }),
             embedId
           )
+          if (iframe.src !== nextUrl) iframe.src = nextUrl
+          if (typeof nextConfig.title !== 'undefined') iframe.title = nextConfig.title
 
           if (typeof nextConfig.width !== 'undefined') iframe.width = String(nextConfig.width)
           if (typeof nextConfig.height !== 'undefined') iframe.height = String(nextConfig.height)
@@ -232,6 +246,8 @@
           }
         },
       }
+      activeInstances.set(target, instance)
+      return instance
     },
   }
 

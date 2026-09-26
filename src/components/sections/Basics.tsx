@@ -32,37 +32,33 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
     <section className="panel">
       <div className="section-head">
         <IconUser size={16} />
-        <span className="section-title">Basics</span>
+        <h2 className="section-title">Basics</h2>
       </div>
       <div className="field-grid">
         <label>
           Name
-          <input value={basics.name} onChange={(e) => onChange({ ...basics, name: e.target.value })} placeholder="Full name" />
+          <input name="name" autoComplete="name" value={basics.name} onChange={(e) => onChange({ ...basics, name: e.target.value })} placeholder="Full name" />
         </label>
         <label>
           Headline
-          <input value={basics.headline} onChange={(e) => onChange({ ...basics, headline: e.target.value })} placeholder="e.g. Software Engineer | Backend Systems" />
+          <input name="headline" autoComplete="organization-title" value={basics.headline} onChange={(e) => onChange({ ...basics, headline: e.target.value })} placeholder="e.g. Software Engineer | Backend Systems" />
         </label>
         <label>
           Email
-          <input value={basics.email} onChange={(e) => onChange({ ...basics, email: e.target.value })} placeholder="name@email.com" />
+          <input name="email" type="email" autoComplete="email" value={basics.email} onChange={(e) => onChange({ ...basics, email: e.target.value })} placeholder="name@email.com" />
         </label>
         <label>
           Phone
-          <input value={basics.phone} onChange={(e) => onChange({ ...basics, phone: e.target.value })} placeholder="+91..." />
+          <input name="phone" type="tel" autoComplete="tel" inputMode="tel" value={basics.phone} onChange={(e) => onChange({ ...basics, phone: e.target.value })} placeholder="+91..." />
         </label>
         <label>
           Location
-          <input value={basics.location} onChange={(e) => onChange({ ...basics, location: e.target.value })} placeholder="City, State" />
+          <input name="location" autoComplete="address-level2" value={basics.location} onChange={(e) => onChange({ ...basics, location: e.target.value })} placeholder="City, State" />
         </label>
       </div>
-      <label>
-        Summary
-        <textarea rows={3} value={basics.summary} onChange={(e) => onChange({ ...basics, summary: e.target.value })} placeholder="2-3 lines on experience, domain, and impact" />
-      </label>
 
       <div className="section-head sub">
-        <span className="section-title">Links</span>
+        <h3 className="section-title">Links</h3>
         <span className="count-badge">{basics.links.length}</span>
         <label className="inline-select-wrap">
           <span className="inline-select-label">Display</span>
@@ -75,7 +71,7 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
             <option value="url">Full URL</option>
           </select>
         </label>
-        <button type="button" className="ghost-add" title="Add link" onClick={addLink}><IconPlus size={14} /></button>
+        <button type="button" className="ghost-add" title="Add link" aria-label="Add link" onClick={addLink}><IconPlus size={14} /></button>
       </div>
       <div className="field-stack">
         {basics.links.map((link, index) => {
@@ -83,11 +79,13 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
           const showCustomLabel = link.label === 'Other' || (!!link.label && !LINK_LABEL_OPTIONS.includes(link.label))
           return (
             <div className="card" key={`link-${index}`}>
-              <button type="button" className="card-close" title="Remove" onClick={() => removeLink(index)}><IconX size={12} /></button>
+              <button type="button" className="card-close" title="Remove link" aria-label={`Remove link ${index + 1}`} onClick={() => removeLink(index)}><IconX size={12} /></button>
               <div className="field-grid">
                 <label>
                   Label
                   <select
+                    name={`link-${index}-label`}
+                    aria-label={`Link ${index + 1} label`}
                     value={showCustomLabel ? 'Other' : hasKnownLabel ? link.label : 'LinkedIn'}
                     onChange={(e) => updateLink(index, 'label', e.target.value === 'Other' ? 'Other' : e.target.value)}
                   >
@@ -96,13 +94,13 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
                 </label>
                 <label>
                   URL
-                  <input value={link.url} onChange={(e) => updateLink(index, 'url', e.target.value)} placeholder="https://..." />
+                  <input name={`link-${index}-url`} aria-label={`Link ${index + 1} URL`} type="url" value={link.url} onChange={(e) => updateLink(index, 'url', e.target.value)} placeholder="https://..." />
                 </label>
               </div>
               {showCustomLabel ? (
                 <label>
                   Custom Label
-                  <input value={link.label === 'Other' ? '' : link.label} onChange={(e) => updateLink(index, 'label', e.target.value)} placeholder="e.g. Portfolio" />
+                  <input name={`link-${index}-custom-label`} value={link.label === 'Other' ? '' : link.label} onChange={(e) => updateLink(index, 'label', e.target.value)} placeholder="e.g. Portfolio" />
                 </label>
               ) : null}
             </div>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { TemplateRenderer } from '../../components/templates/TemplateRenderer'
 import { loadEmbedResume } from '../../lib/storage'
-import { decodeResumeFromUrl } from '../../lib/utils'
+import { createBuilderHandoffUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl } from '../../lib/utils'
 import { validateResume } from '../../schema/validators'
 import type { TemplateName } from '../../types/resume'
 
@@ -58,64 +58,75 @@ function toStructuredIssues(errors: string[], warnings: string[]): StructuredIss
   ]
 }
 
-function normalizeTargetOrigin(value: string): string {
+function normalizeTargetOrigin(value: string | null): string | null {
   if (value === '*') return '*'
+  if (!value) return null
   try {
     return new URL(value).origin
   } catch {
-    return '*'
+    return null
+  }
+}
+
+function getParentOrigin(): string | null {
+  if (window.parent === window) return null
+  try {
+    return new URL(document.referrer).origin
+  } catch {
+    return null
   }
 }
 
 export function EmbedPage() {
   const { resumeId } = useParams()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
+  const resumeLocation = `${location.pathname}${location.search}${location.hash}`
   const rootRef = useRef<HTMLElement>(null)
 
   const showDownload = searchParams.get('showDownload') !== '0' && searchParams.get('disableDownload') !== '1'
-  const primaryColor = searchParams.get('primaryColor') ?? '#111111'
-  const density = searchParams.get('density') === 'compact' ? 'compact' : 'normal'
+  const primaryColor = searchParams.get('primaryColor') ?? undefined
+  const density = searchParams.has('density')
+    ? searchParams.get('density') === 'compact' ? 'compact' : 'comfortable'
+    : undefined
   const mode: EmbedMode = searchParams.get('mode') === 'guided' ? 'guided' : searchParams.get('mode') === 'edit' ? 'edit' : 'preview'
   const debugMode = searchParams.get('debug') === '1'
-  const eventOrigin = normalizeTargetOrigin(searchParams.get('eventOrigin') ?? '*')
+  const eventOrigin = normalizeTargetOrigin(searchParams.get('eventOrigin')) ?? getParentOrigin()
   const embedId = searchParams.get('embedId') ?? 'standalone'
   const sdkVersion = searchParams.get('sdkVersion') ?? 'direct'
   const lockedTemplateParam = searchParams.get('lockedTemplate')
   const lockedTemplate: TemplateName | null = lockedTemplateParam === 'minimal' || lockedTemplateParam === 'compact'
     ? lockedTemplateParam
     : null
-  const readOnlySections = (searchParams.get('readOnlySections') ?? '').split(',').map((value) => value.trim()).filter(Boolean)
+  const readOnlySections = useMemo(
+    () => (searchParams.get('readOnlySections') ?? '').split(',').map((value) => value.trim()).filter(Boolean),
+    [searchParams],
+  )
   const fontScale = Math.max(0.9, Math.min(1.25, Number(searchParams.get('fontScale') ?? '1') || 1))
   const radius = Math.max(4, Math.min(14, Number(searchParams.get('radius') ?? '8') || 8))
 
   const resume = useMemo(() => {
-    const encodedData = searchParams.get('data')
-    if (encodedData) {
-      const decoded = decodeResumeFromUrl(encodedData)
-      if (decoded) {
-        return decoded
-      }
-    }
+    const encodedData = getResumeDataFromUrl(new URL(resumeLocation, window.location.origin))
+    const loaded = encodedData ? decodeResumeFromUrl(encodedData) : null
+    const source = loaded ?? (resumeId ? loadEmbedResume(resumeId) : null)
+    if (!source) return null
 
-    if (!resumeId) {
-      return null
-    }
+    return lockedTemplate
+      ? {
+          ...source,
+          meta: {
+            ...source.meta,
+            template: lockedTemplate,
+          },
+        }
+      : source
+  }, [lockedTemplate, resumeId, resumeLocation])
 
-    const loaded = loadEmbedResume(resumeId)
-    if (!loaded) return null
-
-    if (lockedTemplate) {
-      return {
-        ...loaded,
-        meta: {
-          ...loaded.meta,
-          template: lockedTemplate,
-        },
-      }
-    }
-
-    return loaded
-  }, [lockedTemplate, resumeId, searchParams])
+  const builderHandoffUrl = useMemo(() => {
+    return resume
+      ? createBuilderHandoffUrl(window.location.origin, encodeResumeForUrl(resume))
+      : '/builder'
+  }, [resume])
 
   const validation = useMemo(() => (resume ? validateResume(resume) : null), [resume])
 
@@ -132,7 +143,7 @@ export function EmbedPage() {
   }, [structuredIssues, validation])
 
   const postBridgeEvent = useCallback((event: 'ready' | 'heightChange' | 'validationChange' | 'export' | 'sectionFocus', payload: Record<string, unknown>) => {
-    if (window.parent === window) {
+    if (window.parent === window || !eventOrigin) {
       return
     }
 
@@ -188,7 +199,7 @@ export function EmbedPage() {
       }
       frame = window.requestAnimationFrame(() => {
         frame = 0
-        const height = Math.ceil(document.documentElement.scrollHeight)
+        const height = Math.min(10000, Math.ceil(root.scrollHeight))
         postBridgeEvent('heightChange', { height })
       })
     }
@@ -210,19 +221,24 @@ export function EmbedPage() {
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
+
     const sections = root.querySelectorAll<HTMLElement>('.resume-template section')
     if (sections.length === 0) return
-
     const seen = new Set<string>()
+    const visibleSections = new Map<Element, number>()
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (!entry.isIntersecting || entry.intersectionRatio < 0.55) return
-        const label = entry.target.querySelector('h2')?.textContent?.trim() ?? 'section'
-        if (seen.has(label)) return
-        seen.add(label)
-        postBridgeEvent('sectionFocus', { section: label })
+        if (entry.isIntersecting) visibleSections.set(entry.target, entry.intersectionRatio)
+        else visibleSections.delete(entry.target)
       })
-    }, { threshold: [0.55] })
+
+      const current = [...visibleSections.entries()].sort((left, right) => right[1] - left[1])[0]
+      if (!current || current[1] < 0.1) return
+      const label = (current[0] as HTMLElement).querySelector('h2')?.textContent?.trim() ?? 'section'
+      if (seen.has(label)) return
+      seen.add(label)
+      postBridgeEvent('sectionFocus', { section: label })
+    }, { threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] })
 
     sections.forEach((section) => observer.observe(section))
     return () => observer.disconnect()
@@ -264,7 +280,7 @@ export function EmbedPage() {
         {showDownload ? (
           <a
             className="link-button"
-            href="/builder"
+            href={builderHandoffUrl}
             target="_blank"
             rel="noreferrer"
             onClick={() => postBridgeEvent('export', { action: mode === 'edit' ? 'open-builder-edit' : 'open-builder' })}

@@ -12,6 +12,7 @@ import {
   hasText,
   hasVolunteeringItem,
 } from '../../lib/contentChecks'
+import { getSafeExternalUrl } from '../../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../../lib/utils'
 import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../../types/resume'
 
@@ -75,7 +76,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
                   </strong>
                   <div className="resume-row-meta">{formatDateRangeByStyle(item.startDate, item.endDate, options.dateStyle)}</div>
                 </div>
-                <p>{item.location}</p>
+                {item.location ? <p>{item.location}</p> : null}
                 <ul>
                   {item.bullets.filter(Boolean).map((bullet, bulletIndex) => (
                     <li key={bulletIndex}>{bulletPrefix} {bullet}</li>
@@ -96,8 +97,8 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
                   <div className="resume-row-meta">{formatDateRangeByStyle(item.startDate, item.endDate, options.dateStyle)}</div>
                 </div>
                 {item.techStack.length > 0 ? <p>Tech: {item.techStack.join(', ')}</p> : null}
-                {item.projectLink ? <p>Live: <a href={item.projectLink} target="_blank" rel="noreferrer">{item.projectLink}</a></p> : null}
-                {item.repoLink ? <p>Repo: <a href={item.repoLink} target="_blank" rel="noreferrer">{item.repoLink}</a></p> : null}
+                {item.projectLink ? <p>Live: {getSafeExternalUrl(item.projectLink) ? <a href={getSafeExternalUrl(item.projectLink)} target="_blank" rel="noreferrer">{item.projectLink}</a> : item.projectLink}</p> : null}
+                {item.repoLink ? <p>Repo: {getSafeExternalUrl(item.repoLink) ? <a href={getSafeExternalUrl(item.repoLink)} target="_blank" rel="noreferrer">{item.repoLink}</a> : item.repoLink}</p> : null}
                 <ul>
                   {item.bullets.filter(Boolean).map((bullet, bulletIndex) => (
                     <li key={bulletIndex}>{bulletPrefix} {bullet}</li>
@@ -164,11 +165,11 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
                   <strong>{item.role || 'Role'}{item.organization ? `, ${item.organization}` : ''}</strong>
                   <div className="resume-row-meta">{formatDateRangeByStyle(item.startDate, item.endDate, options.dateStyle)}</div>
                 </div>
-                <p>{item.location}</p>
+                {item.location ? <p>{item.location}</p> : null}
                 {item.referenceUrl ? (
-                  <a href={item.referenceUrl} target="_blank" rel="noreferrer">
-                    Reference / Certificate
-                  </a>
+                  getSafeExternalUrl(item.referenceUrl)
+                    ? <a href={getSafeExternalUrl(item.referenceUrl)} target="_blank" rel="noreferrer">Reference / Certificate</a>
+                    : <span>Reference / Certificate: {item.referenceUrl}</span>
                 ) : null}
               </div>
             ))}
@@ -206,7 +207,9 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
                 </div>
                 <p>{item.venue}</p>
                 {item.url ? (
-                  <a href={item.url} target="_blank" rel="noreferrer">{item.url}</a>
+                  getSafeExternalUrl(item.url)
+                    ? <a href={getSafeExternalUrl(item.url)} target="_blank" rel="noreferrer">{item.url}</a>
+                    : <span>{item.url}</span>
                 ) : null}
               </div>
             ))}
@@ -226,13 +229,14 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
           {[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}
         </p>
         <div className="link-row">
-          {resume.basics.links
-            .filter((link) => !!link.url)
-            .map((link, index) => (
-              <a href={link.url} target="_blank" rel="noreferrer" key={`${link.url}-${index}`}>
+          {resume.basics.links.map((link, index) => {
+            const safeUrl = getSafeExternalUrl(link.url)
+            return safeUrl ? (
+              <a href={safeUrl} target="_blank" rel="noreferrer" key={`${link.url}-${index}`}>
                 {linkText(link.label, link.url)}
               </a>
-            ))}
+            ) : null
+          })}
         </div>
       </header>
 

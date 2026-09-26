@@ -6,7 +6,7 @@ test('mobile pane switch animates (fade + rise)', async ({ page, isMobile }) => 
   await page.goto('/builder')
   await expect(page.getByText('Resume Readiness')).toBeVisible()
 
-  const previewTab = page.locator('.mobile-view-toggle').getByRole('tab', { name: 'Preview' })
+  const previewTab = page.locator('.mobile-view-toggle').getByRole('button', { name: 'Preview' })
   await previewTab.click()
 
   const pane = page.locator('.right-pane')

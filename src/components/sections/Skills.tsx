@@ -23,15 +23,15 @@ function SkillCategoryEditor({ title, values, onChange }: { title: string; value
     <div className="card skill-category">
       <h4 className="skill-cat-title">{title}</h4>
       <div className="skill-input-row">
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} placeholder={`Add ${title.toLowerCase()} (press Enter)`} />
-        <button type="button" className="ghost-add" title="Add" onClick={add}><IconPlus size={12} /></button>
+        <input aria-label={`Add ${title.toLowerCase()}`} name={`skill-${title.toLowerCase()}`} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} placeholder={`Add ${title.toLowerCase()} (press Enter)`} />
+        <button type="button" className="ghost-add" title={`Add ${title.toLowerCase()}`} aria-label={`Add ${title.toLowerCase()}`} onClick={add}><IconPlus size={12} /></button>
       </div>
       {values.length > 0 ? (
         <div className="chip-list">
           {values.map((s, i) => (
             <span className="chip" key={`${title}-${i}`}>
               {s}
-              <button type="button" onClick={() => onChange(values.filter((_, j) => j !== i))}>×</button>
+              <button type="button" aria-label={`Remove ${s}`} onClick={() => onChange(values.filter((_, j) => j !== i))}>×</button>
             </span>
           ))}
         </div>
@@ -47,7 +47,7 @@ export function SkillsSection({ skills, onChange }: SkillsSectionProps) {
     <section className="panel">
       <div className="section-head">
         <IconZap size={16} />
-        <span className="section-title">Skills</span>
+        <h2 className="section-title">Skills</h2>
         <span className="count-badge">{total}</span>
       </div>
       <div className="field-stack">

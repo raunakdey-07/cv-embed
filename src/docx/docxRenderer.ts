@@ -22,6 +22,7 @@ import {
   hasText,
   hasVolunteeringItem,
 } from '../lib/contentChecks'
+import { getSafeExternalUrl } from '../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../lib/utils'
 import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../types/resume'
 
@@ -60,6 +61,8 @@ function sectionTitleParagraph(title: string, resume: Resume): Paragraph {
 
   return new Paragraph({
     spacing: { before: 220, after: 100 },
+    keepNext: true,
+    keepLines: true,
     border: showRule
       ? {
           bottom: { color: 'DFE4EA', size: 6, style: BorderStyle.SINGLE },
@@ -84,6 +87,7 @@ function rowParagraph(left: string, right: string, resume: Resume): Paragraph {
   if (!right.trim()) {
     return new Paragraph({
       spacing: { after: 60 },
+      keepLines: true,
       children: [
         new TextRun({ text: left, bold: true, size: textSize, font: toDocxFontFamily(options.fontFamily) }),
       ],
@@ -93,6 +97,7 @@ function rowParagraph(left: string, right: string, resume: Resume): Paragraph {
   return new Paragraph({
     tabStops: [{ type: TabStopType.RIGHT, position: 9020 }],
     spacing: { after: 60 },
+    keepLines: true,
     children: [
       new TextRun({ text: left, bold: true, size: textSize, font: toDocxFontFamily(options.fontFamily) }),
       new TextRun({ text: `\t${right}`, size: textSize, color: '4B5563', font: toDocxFontFamily(options.fontFamily) }),
@@ -104,18 +109,24 @@ function bodyParagraph(text: string, resume: Resume): Paragraph {
   const options = resume.meta.documentOptions
   return new Paragraph({
     spacing: { after: 50, line: toDocxLineSpacing(options.lineHeight) },
+    keepLines: true,
     children: [new TextRun({ text, size: toDocxFontSize(options.fontSize), font: toDocxFontFamily(options.fontFamily) })],
   })
 }
 
 function linkParagraph(prefix: string, label: string, url: string, resume: Resume): Paragraph {
   const options = resume.meta.documentOptions
+  const safeUrl = getSafeExternalUrl(url)
+  if (!safeUrl) {
+    return bodyParagraph(`${prefix}${label}`, resume)
+  }
+
   return new Paragraph({
     spacing: { after: 50, line: toDocxLineSpacing(options.lineHeight) },
     children: [
       new TextRun({ text: prefix, size: toDocxFontSize(options.fontSize), font: toDocxFontFamily(options.fontFamily) }),
       new ExternalHyperlink({
-        link: url,
+        link: safeUrl,
         children: [
           new TextRun({
             text: label,
@@ -136,6 +147,7 @@ function bulletParagraph(text: string, resume: Resume): Paragraph {
   if (options.bulletStyle === 'dash') {
     return new Paragraph({
       spacing: { after: 40, line: toDocxLineSpacing(options.lineHeight) },
+      keepLines: true,
       indent: { left: 360 },
       children: [
         new TextRun({ text: `— ${text}`, size: toDocxFontSize(options.fontSize), font: toDocxFontFamily(options.fontFamily) }),
@@ -145,6 +157,7 @@ function bulletParagraph(text: string, resume: Resume): Paragraph {
 
   return new Paragraph({
     spacing: { after: 40, line: toDocxLineSpacing(options.lineHeight) },
+    keepLines: true,
     bullet: { level: 0 },
     children: [
       new TextRun({ text, size: toDocxFontSize(options.fontSize), font: toDocxFontFamily(options.fontFamily) }),
@@ -292,9 +305,20 @@ function createResumeDocxDocument(resume: Resume): Document {
       if (index > 0) {
         linkRuns.push(new TextRun({ text: ' • ', size: toDocxFontSize(options.fontSize), font: toDocxFontFamily(options.fontFamily) }))
       }
+
+      const safeUrl = getSafeExternalUrl(link.url)
+      if (!safeUrl) {
+        linkRuns.push(new TextRun({
+          text: linkValue(link.label, link.url),
+          size: toDocxFontSize(options.fontSize),
+          font: toDocxFontFamily(options.fontFamily),
+        }))
+        return
+      }
+
       linkRuns.push(
         new ExternalHyperlink({
-          link: link.url,
+          link: safeUrl,
           children: [
             new TextRun({
               text: linkValue(link.label, link.url),

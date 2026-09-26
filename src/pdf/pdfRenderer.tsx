@@ -20,6 +20,8 @@ import {
   hasText,
   hasVolunteeringItem,
 } from '../lib/contentChecks'
+import { assertPdfTextSupported } from '../lib/pdfText'
+import { getSafeExternalUrl } from '../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../lib/utils'
 import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../types/resume'
 
@@ -94,6 +96,7 @@ function getPdfStyleConfig(resume: Resume) {
           : (options.fontSize === 'small' ? 10 : 11),
       fontWeight: 700,
       marginBottom: compactDensity ? 3 : relaxedDensity ? 5 : 4,
+      minPresenceAhead: 24,
       textTransform: options.sectionHeadingStyle === 'minimal' ? 'none' : 'uppercase',
       color: headingColor,
       borderBottom: options.sectionHeadingStyle === 'rule' ? 1 : 0,
@@ -151,7 +154,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           <View style={styles.section} key="education">
             <Text style={styles.sectionTitle}>Education</Text>
             {resume.education.filter(hasEducationItem).map((item, index) => (
-              <View key={`education-${index}`} style={styles.item}>
+              <View key={`education-${index}`} style={styles.item} wrap={shouldKeepTogether(item)}>
                 <View style={styles.row}>
                   <Text style={styles.itemTitle}>{item.institution}</Text>
                   <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
@@ -167,7 +170,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           <View style={styles.section} key="experience">
             <Text style={styles.sectionTitle}>Experience</Text>
             {resume.experience.filter(hasExperienceItem).map((item, index) => (
-              <View key={`experience-${index}`} style={styles.item}>
+              <View key={`experience-${index}`} style={styles.item} wrap={shouldKeepTogether(item)}>
                 <View style={styles.row}>
                   <Text style={styles.itemTitle}>{item.role}{item.company ? `, ${item.company}` : ''}</Text>
                   <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
@@ -184,20 +187,24 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
         return shouldRender('projects', hasContent(resume.projects)) ? (
           <View style={styles.section} key="projects">
             <Text style={styles.sectionTitle}>Projects</Text>
-            {resume.projects.filter(hasProjectItem).map((item, index) => (
-              <View key={`project-${index}`} style={styles.item}>
-                <View style={styles.row}>
-                  <Text style={styles.itemTitle}>{item.title}</Text>
-                  <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
+            {resume.projects.filter(hasProjectItem).map((item, index) => {
+              const projectUrl = getSafeExternalUrl(item.projectLink)
+              const repoUrl = getSafeExternalUrl(item.repoLink)
+              return (
+                <View key={`project-${index}`} style={styles.item} wrap={shouldKeepTogether(item)}>
+                  <View style={styles.row}>
+                    <Text style={styles.itemTitle}>{item.title}</Text>
+                    <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
+                  </View>
+                  {item.techStack.length > 0 ? <Text>Tech: {item.techStack.join(', ')}</Text> : null}
+                  {item.projectLink ? <Text>Live: {projectUrl ? <Link src={projectUrl}>{item.projectLink}</Link> : item.projectLink}</Text> : null}
+                  {item.repoLink ? <Text>Repo: {repoUrl ? <Link src={repoUrl}>{item.repoLink}</Link> : item.repoLink}</Text> : null}
+                  {item.bullets.filter(Boolean).map((bullet, bulletIndex) => (
+                    <Text key={`proj-bullet-${index}-${bulletIndex}`} style={styles.bullet}>{bulletPrefix} {bullet}</Text>
+                  ))}
                 </View>
-                {item.techStack.length > 0 ? <Text>Tech: {item.techStack.join(', ')}</Text> : null}
-                {item.projectLink ? <Text>Live: <Link src={item.projectLink}>{item.projectLink}</Link></Text> : null}
-                {item.repoLink ? <Text>Repo: <Link src={item.repoLink}>{item.repoLink}</Link></Text> : null}
-                {item.bullets.filter(Boolean).map((bullet, bulletIndex) => (
-                  <Text key={`proj-bullet-${index}-${bulletIndex}`} style={styles.bullet}>{bulletPrefix} {bullet}</Text>
-                ))}
-              </View>
-            ))}
+              )
+            })}
           </View>
         ) : null
       case 'skills':
@@ -233,7 +240,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           <View style={styles.section} key="accomplishments">
             <Text style={styles.sectionTitle}>Accomplishments</Text>
             {resume.accomplishments.filter(hasAccomplishmentItem).map((item, index) => (
-              <View key={`accomplishment-${index}`}>
+              <View key={`accomplishment-${index}`} wrap={shouldKeepTogether(item)}>
                 <View style={styles.row}>
                   <Text style={styles.itemTitle}>{item.title}</Text>
                   <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
@@ -250,16 +257,19 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
         return shouldRender('activities', hasContent(resume.activities)) ? (
           <View style={styles.section} key="activities">
             <Text style={styles.sectionTitle}>Extra-curricular Activities</Text>
-            {resume.activities.filter(hasActivityItem).map((item, index) => (
-              <View key={`activity-${index}`}>
-                <View style={styles.row}>
-                  <Text style={styles.itemTitle}>{item.role}{item.organization ? `, ${item.organization}` : ''}</Text>
-                  <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
+            {resume.activities.filter(hasActivityItem).map((item, index) => {
+              const referenceUrl = getSafeExternalUrl(item.referenceUrl)
+              return (
+                <View key={`activity-${index}`} wrap={shouldKeepTogether(item)}>
+                  <View style={styles.row}>
+                    <Text style={styles.itemTitle}>{item.role}{item.organization ? `, ${item.organization}` : ''}</Text>
+                    <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
+                  </View>
+                  {item.location ? <Text>{item.location}</Text> : null}
+                  {item.referenceUrl ? (referenceUrl ? <Link src={referenceUrl}>Reference / Certificate</Link> : <Text>Reference / Certificate: {item.referenceUrl}</Text>) : null}
                 </View>
-                {item.location ? <Text>{item.location}</Text> : null}
-                {item.referenceUrl ? <Link src={item.referenceUrl}>Reference / Certificate</Link> : null}
-              </View>
-            ))}
+              )
+            })}
           </View>
         ) : null
       case 'volunteering':
@@ -267,7 +277,7 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           <View style={styles.section} key="volunteering">
             <Text style={styles.sectionTitle}>Volunteering</Text>
             {resume.volunteering.filter(hasVolunteeringItem).map((item, index) => (
-              <View key={`volunteering-${index}`}>
+              <View key={`volunteering-${index}`} wrap={shouldKeepTogether(item)}>
                 <View style={styles.row}>
                   <Text style={styles.itemTitle}>{item.role}{item.organization ? `, ${item.organization}` : ''}</Text>
                   <Text style={styles.rowMeta}>{dateValue(item.startDate, item.endDate)}</Text>
@@ -284,16 +294,19 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
         return shouldRender('publications', hasContent(resume.publications)) ? (
           <View style={styles.section} key="publications">
             <Text style={styles.sectionTitle}>Publications</Text>
-            {resume.publications.filter(hasPublicationItem).map((item, index) => (
-              <View key={`publication-${index}`}>
-                <View style={styles.row}>
-                  <Text style={styles.itemTitle}>{item.title}</Text>
-                  <Text style={styles.rowMeta}>{singleDate(item.date)}</Text>
+            {resume.publications.filter(hasPublicationItem).map((item, index) => {
+              const publicationUrl = getSafeExternalUrl(item.url)
+              return (
+                <View key={`publication-${index}`} wrap={shouldKeepTogether(item)}>
+                  <View style={styles.row}>
+                    <Text style={styles.itemTitle}>{item.title}</Text>
+                    <Text style={styles.rowMeta}>{singleDate(item.date)}</Text>
+                  </View>
+                  {item.venue ? <Text>{item.venue}</Text> : null}
+                  {item.url ? (publicationUrl ? <Link src={publicationUrl}>{item.url}</Link> : <Text>{item.url}</Text>) : null}
                 </View>
-                {item.venue ? <Text>{item.venue}</Text> : null}
-                {item.url ? <Link src={item.url}>{item.url}</Link> : null}
-              </View>
-            ))}
+              )
+            })}
           </View>
         ) : null
       default:
@@ -309,13 +322,14 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
           {resume.basics.headline ? <Text style={styles.headline}>{resume.basics.headline}</Text> : null}
           <Text style={styles.contact}>{[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}</Text>
           <View style={styles.linksRow}>
-            {resume.basics.links
-              .filter((link) => !!link.url)
-              .map((link, index) => (
-                <Link key={`link-${index}`} src={link.url} style={styles.linkItem}>
+            {resume.basics.links.map((link, index) => {
+              const safeUrl = getSafeExternalUrl(link.url)
+              return safeUrl ? (
+                <Link key={`link-${index}`} src={safeUrl} style={styles.linkItem}>
                   {linkValue(link.label, link.url)}
                 </Link>
-              ))}
+              ) : null
+            })}
           </View>
         </View>
 
@@ -327,6 +341,10 @@ function ResumePdfDocument({ resume }: { resume: Resume }) {
 
 async function renderResumePdfBlob(resume: Resume): Promise<Blob> {
   return pdf(<ResumePdfDocument resume={resume} />).toBlob()
+}
+
+function shouldKeepTogether(value: unknown): boolean {
+  return JSON.stringify(value).length < 1000
 }
 
 function percentile(values: number[], pct: number): number {
@@ -459,6 +477,7 @@ export async function countPdfPages(resume: Resume): Promise<number> {
 }
 
 export async function downloadResumePdf(resume: Resume, fileName: string): Promise<void> {
+  assertPdfTextSupported(resume)
   const blob = await renderResumePdfBlob(resume)
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)

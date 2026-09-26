@@ -84,12 +84,14 @@ export function SectionNav({
   const orderedSections = sectionOrder.length > 0 ? sectionOrder : []
 
   return (
-    <nav className="section-nav" ref={rootRef}>
+    <nav className="section-nav" ref={rootRef} aria-label="Resume sections">
       <div className="section-nav-tabs">
         {sections.filter((s) => s.id !== 'document-options').map((s) => (
           <button
             key={s.id}
+            type="button"
             className={`nav-tab ${s.active ? 'active' : ''}`}
+            aria-current={s.active ? 'page' : undefined}
             onClick={() => onSelect(s.id)}
             title={s.label}
           >
@@ -110,7 +112,7 @@ export function SectionNav({
           <IconChevronDown size={9} />
         </button>
         {formatOpen ? (
-          <div className="organize-sheet format-sheet" role="dialog" aria-label="Formatting">
+          <div className="organize-sheet format-sheet" role="group" aria-label="Formatting">
             <p className="organize-sheet-title">Formatting</p>
             {formatSheet}
           </div>
@@ -129,7 +131,7 @@ export function SectionNav({
           <IconChevronDown size={9} />
         </button>
         {organizeOpen ? (
-          <div className="organize-sheet" role="dialog" aria-label="Visibility and order">
+          <div className="organize-sheet" role="group" aria-label="Visibility and order">
             <p className="organize-sheet-title">Visibility &amp; Order</p>
             <div className="order-list">
               {orderedSections.map((sectionId, index) => (
@@ -146,6 +148,7 @@ export function SectionNav({
                     <button
                       type="button"
                       className="order-btn"
+                      aria-label={`Move ${ORDER_LABELS[sectionId]} up`}
                       onClick={() => onMoveSection(sectionId, -1)}
                       disabled={index === 0}
                       title="Move up"
@@ -153,6 +156,7 @@ export function SectionNav({
                     <button
                       type="button"
                       className="order-btn"
+                      aria-label={`Move ${ORDER_LABELS[sectionId]} down`}
                       onClick={() => onMoveSection(sectionId, 1)}
                       disabled={index === orderedSections.length - 1}
                       title="Move down"

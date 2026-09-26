@@ -19,17 +19,31 @@ test('embed panel: opens, shows friendly snippets, live preview works', async ({
   const shareLink = strip.locator('a[aria-label="Open embed URL"]')
   await expect(shareLink).toBeVisible()
   const href = await shareLink.getAttribute('href')
-  expect(href).toContain('/embed/portable?data=')
+  expect(href).toContain('/embed/portable?')
+  expect(href).toContain('#data=')
+  expect(href).not.toContain('?data=')
 
   // Snippet cards use friendly labels.
   await expect(strip.getByText('Website / portal')).toBeVisible()
   await expect(strip.getByText('React app')).toBeVisible()
   await expect(strip.getByText('Advanced (auto-height + events)')).toBeVisible()
 
-  // SDK snippet must NOT inline the whole resume JSON.
+  // The generated SDK snippet carries the same resume and executes as pasted.
   const sdkCode = await strip.locator('.embed-snippet-card', { hasText: 'Advanced' }).locator('.embed-snippet-code').textContent()
-  expect(sdkCode!.length).toBeLessThan(1200)
-  expect(sdkCode).toContain('resumeId')
+  expect(sdkCode).toContain('resumeData:')
+  expect(sdkCode).not.toContain('resumeId:')
+
+  const sdkHost = await page.context().newPage()
+  await sdkHost.goto('/builder')
+  await sdkHost.evaluate(() => {
+    document.getElementById('root')!.innerHTML = '<div id="resume-container"></div>'
+  })
+  await sdkHost.addScriptTag({ url: new URL('/sdk.js?v=2', sdkHost.url()).toString() })
+  const inlineSdk = sdkCode!.match(/<script>\n([\s\S]*?)<\/script>/)?.[1]
+  expect(inlineSdk).toBeTruthy()
+  await sdkHost.evaluate((code) => window.eval(code), inlineSdk!)
+  await expect(sdkHost.frameLocator('iframe').locator('.resume-template')).toBeVisible({ timeout: 15_000 })
+  await sdkHost.close()
 
   // Live preview iframe renders the actual resume (open the collapsed <details> first).
   await strip.locator('.embed-preview-details summary').click()

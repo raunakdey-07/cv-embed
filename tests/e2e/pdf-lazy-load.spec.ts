@@ -48,7 +48,7 @@ test.describe('PDF engine lazy loading', () => {
 
     // Opening the export menu is the on-demand trigger (switch to Preview
     // first — that's where the toolbar lives on mobile).
-    await page.locator('.mobile-view-toggle').getByRole('tab', { name: 'Preview' }).click()
+    await page.locator('.mobile-view-toggle').getByRole('button', { name: 'Preview' }).click()
     const exportButton = page.locator('.preview-head .tool-btn[title="Export resume"]')
     await expect(exportButton).toBeVisible()
     await exportButton.click()
@@ -56,7 +56,7 @@ test.describe('PDF engine lazy loading', () => {
     await expect.poll(() => pdfRequests.length, { timeout: 15_000 }).toBeGreaterThan(0)
   })
 
-  test('desktop: pdf chunk loads via idle estimate as before', async ({ page, isMobile }) => {
+  test('desktop: pdf chunk loads only after export is opened', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop-only flow')
     await seedDraft(page)
 
@@ -66,6 +66,12 @@ test.describe('PDF engine lazy loading', () => {
     })
 
     await page.goto('/builder')
-    await expect.poll(() => pdfRequests.length, { timeout: 20_000 }).toBeGreaterThan(0)
+    await expect(page.getByText('Resume Readiness')).toBeVisible()
+    await page.waitForTimeout(5000)
+    expect(pdfRequests).toEqual([])
+
+    await page.locator('.preview-head .tool-btn[title="Export resume"]').click()
+    await expect(page.locator('.export-dropdown')).toBeVisible()
+    await expect.poll(() => pdfRequests.length, { timeout: 15_000 }).toBeGreaterThan(0)
   })
 })

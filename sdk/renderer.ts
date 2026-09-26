@@ -67,6 +67,18 @@ function encodeResumeData(resumeData: unknown): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
+function getDefaultBaseUrl(): string {
+  const script = document.currentScript as HTMLScriptElement | null
+  if (script?.src) {
+    try {
+      return new URL(script.src, window.location.href).origin
+    } catch {
+      // Fall through to the current origin.
+    }
+  }
+  return window.location.origin
+}
+
 function resolveTarget(target: string | HTMLElement): HTMLElement | null {
   if (typeof target === 'string') {
     return document.querySelector(target)
@@ -82,13 +94,17 @@ function mergeEvents(left?: CVEmbedEvents, right?: CVEmbedEvents): CVEmbedEvents
   return { ...(left ?? {}), ...(right ?? {}) }
 }
 
+const activeInstances = new WeakMap<HTMLElement, CVEmbedInstance>()
+
 export function buildEmbedUrl(config: CVEmbedConfig, embedId?: string): string {
-  const baseUrl = config.baseUrl ?? window.location.origin
-  const resumePath = config.resumeId ?? 'portable'
+  const baseUrl = config.baseUrl ?? getDefaultBaseUrl()
+  const resumePath = encodeURIComponent(config.resumeId ?? 'portable')
   const url = new URL(`/embed/${resumePath}`, baseUrl)
 
   if (config.resumeData) {
-    url.searchParams.set('data', encodeResumeData(config.resumeData))
+    const fragment = new URLSearchParams()
+    fragment.set('data', encodeResumeData(config.resumeData))
+    url.hash = fragment.toString()
   }
 
   if (config.theme?.primaryColor) {
@@ -127,9 +143,7 @@ export function buildEmbedUrl(config: CVEmbedConfig, embedId?: string): string {
     url.searchParams.set('disableImport', '1')
   }
 
-  if (config.options?.eventTargetOrigin) {
-    url.searchParams.set('eventOrigin', config.options.eventTargetOrigin)
-  }
+  url.searchParams.set('eventOrigin', config.options?.eventTargetOrigin ?? window.location.origin)
 
   if (typeof config.theme?.fontScale === 'number') {
     url.searchParams.set('fontScale', String(config.theme.fontScale))
@@ -158,6 +172,8 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
     throw new Error(`Target not found: ${String(config.target)}`)
   }
 
+  activeInstances.get(target)?.destroy()
+
   let activeConfig = { ...config }
   let listeners = mergeEvents(config.events)
   const embedId = randomEmbedId()
@@ -173,12 +189,13 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   iframe.referrerPolicy = 'strict-origin-when-cross-origin'
 
   const onMessage = (event: MessageEvent) => {
-    if (event.source !== iframe.contentWindow) {
+    const expectedOrigin = new URL(activeConfig.baseUrl ?? getDefaultBaseUrl(), window.location.href).origin
+    if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) {
       return
     }
 
     const data = event.data as CVEmbedBridgeEvent | undefined
-    if (!data || data.source !== 'cv-embed' || data.version !== '2' || data.embedId !== embedId) {
+    if (!data || data.source !== 'cv-embed' || data.version !== '2' || data.embedId !== embedId || !data.payload || typeof data.payload !== 'object') {
       return
     }
 
@@ -191,7 +208,10 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
     if (data.event === 'heightChange') {
       const nextHeight = Number(data.payload.height)
       if (activeConfig.options?.autoHeight !== false && Number.isFinite(nextHeight) && nextHeight > 0) {
-        iframe.height = String(Math.round(nextHeight))
+        const appliedHeight = Math.min(10000, Math.round(nextHeight))
+        iframe.height = String(appliedHeight)
+        listeners.onHeightChange?.({ height: appliedHeight })
+        return
       }
       listeners.onHeightChange?.({ height: nextHeight })
     }
@@ -204,6 +224,9 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
 
   const destroy = () => {
     window.removeEventListener('message', onMessage)
+    if (activeInstances.get(target) === instance) {
+      activeInstances.delete(target)
+    }
     if (iframe.parentElement === target) {
       target.removeChild(iframe)
     }
@@ -218,8 +241,14 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
       events: mergeEvents(activeConfig.events, nextConfig.events),
     }
     listeners = mergeEvents(listeners, nextConfig.events)
-    iframe.src = buildEmbedUrl(activeConfig, embedId)
+    const nextUrl = buildEmbedUrl(activeConfig, embedId)
+    if (iframe.src !== nextUrl) {
+      iframe.src = nextUrl
+    }
 
+    if (typeof nextConfig.title !== 'undefined') {
+      iframe.title = nextConfig.title
+    }
     if (typeof nextConfig.width !== 'undefined') {
       iframe.width = String(nextConfig.width)
     }
@@ -238,11 +267,13 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
     }
   }
 
-  return {
+  const instance: CVEmbedInstance = {
     destroy,
     update,
     getIframe: () => iframe,
     on,
     off,
   }
+  activeInstances.set(target, instance)
+  return instance
 }

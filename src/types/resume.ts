@@ -221,19 +221,9 @@ export function createEmptyResume(): Resume {
       phone: '',
       location: '',
       summary: '',
-      links: [{ label: '', url: '' }],
+      links: [],
     },
-    education: [
-      {
-        institution: '',
-        degree: '',
-        field: '',
-        cgpa: '',
-        startDate: '',
-        endDate: '',
-        location: '',
-      },
-    ],
+    education: [],
     experience: [],
     projects: [],
     skills: {

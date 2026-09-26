@@ -9,6 +9,7 @@ import { ExperienceSection } from '../../components/sections/Experience'
 import { PublicationsSection } from '../../components/sections/Publications'
 import { ProjectsSection } from '../../components/sections/Projects'
 import { SkillsSection } from '../../components/sections/Skills'
+import { SummarySection } from '../../components/sections/Summary'
 import { VolunteeringSection } from '../../components/sections/Volunteering'
 import { TemplateRenderer } from '../../components/templates/TemplateRenderer'
 import {
@@ -17,9 +18,9 @@ import {
   IconEye, IconFileText, IconFlag, IconGraduationCap,
   IconSliders, IconTrophy, IconUpload, IconUser, IconZap,
 } from '../../components/ui/Icons'
-import { encodeResumeForUrl, normalizeResume } from '../../lib/utils'
+import { createDownloadFileName, createPortableResumeUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl, MAX_PORTABLE_PAYLOAD_CHARS, normalizeResume, withUpdatedTimestamp } from '../../lib/utils'
 import { DEFAULT_SECTION_ORDER } from '../../types/resume'
-import { loadDraft, saveDraft } from '../../lib/storage'
+import { loadDraft, loadPublicBaseUrl, saveDraft, savePublicBaseUrl } from '../../lib/storage'
 import { resolveNextActionSection, type BuilderSectionId } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
 import { createEmptyResume, type DocumentOptions, type Resume, type ResumeSectionKey } from '../../types/resume'
@@ -44,13 +45,9 @@ function getDefaultEmbedBaseUrl(): string {
     return envBaseUrl
   }
 
-  const stored = normalizeBaseUrl(localStorage.getItem('cv-embed:public-base-url') ?? '')
+  const stored = normalizeBaseUrl(loadPublicBaseUrl())
   if (stored) {
     return stored
-  }
-
-  if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(window.location.hostname)) {
-    return 'https://cv-embed.vercel.app'
   }
 
   return normalizeBaseUrl(window.location.origin)
@@ -59,15 +56,13 @@ function getDefaultEmbedBaseUrl(): string {
 function buildEmbedArtifacts(baseUrl: string, resume: Resume, options: EmbedBuildOptions): EmbedArtifacts {
   const origin = normalizeBaseUrl(baseUrl) || getDefaultEmbedBaseUrl()
   const encoded = encodeResumeForUrl(resume)
-  const portable = new URL('/embed/portable', origin)
-  portable.searchParams.set('data', encoded)
-  if (!options.showDownload) {
-    portable.searchParams.set('showDownload', '0')
-  }
-  const portableUrl = portable.toString()
+  const portableUrl = createPortableResumeUrl(origin, encoded, options.showDownload)
+  const sdkPayload = encoded.replace(/-/g, '+').replace(/_/g, '/')
+  const paddedSdkPayload = sdkPayload + '='.repeat((4 - (sdkPayload.length % 4)) % 4)
+  const sdkResumeData = `JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('${paddedSdkPayload}'), function (character) { return character.charCodeAt(0) })))`
   const sdkUrl = `${origin}/sdk.js?v=2`
   const iframeSnippet = `<iframe src="${portableUrl}" width="100%" height="${options.iframeHeight}" frameborder="0" loading="lazy" title="Resume"></iframe>`
-  const sdkSnippet = `<script src="${sdkUrl}"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeId: 'portable', // or pass resumeData with your resume JSON\n    height: ${options.iframeHeight},\n    options: {\n      showDownload: ${options.showDownload ? 'true' : 'false'},\n      autoHeight: true\n    },\n    events: {\n      onReady: () => console.log('resume loaded'),\n      onHeightChange: ({ height }) => console.log('resized to', height)\n    }\n  });\n</script>`
+  const sdkSnippet = `<script src="${sdkUrl}"></script>\n<div id="resume-container"></div>\n<script>\n  CVEmbed.render({\n    target: '#resume-container',\n    baseUrl: '${origin}',\n    resumeData: ${sdkResumeData},\n    height: ${options.iframeHeight},\n    options: {\n      showDownload: ${options.showDownload ? 'true' : 'false'},\n      autoHeight: true\n    },\n    events: {\n      onReady: () => console.log('resume loaded'),\n      onHeightChange: ({ height }) => console.log('resized to', height)\n    }\n  });\n</script>`
   const reactSnippet = `<iframe src="${portableUrl}" style={{ width: '100%', height: '${options.iframeHeight}px', border: 0 }} loading="lazy" title="Resume" />`
   const integrationPack = [
     'CV-Embed Integration Pack v2',
@@ -209,16 +204,29 @@ function formatRelativeTime(from: number, to: number): string {
   return `${days}d ago`
 }
 
-function downloadJson(resume: Resume): void {
+function downloadJson(resume: Resume, fileName = 'resume.json'): void {
   const blob = new Blob([JSON.stringify(resume, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url; a.download = 'resume.json'
+  a.href = url; a.download = fileName
   document.body.appendChild(a); a.click(); a.remove()
   URL.revokeObjectURL(url)
 }
 
 const DRAFT_SAVE_DEBOUNCE_MS = 900
+
+function getScrollBehavior(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+}
+
+function loadInitialResume(): Resume {
+  const handoffData = getResumeDataFromUrl(new URL(window.location.href))
+  if (handoffData) {
+    const decoded = decodeResumeFromUrl(handoffData)
+    if (decoded) return decoded
+  }
+  return loadDraft() ?? createEmptyResume()
+}
 
 export function BuilderPage() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -228,11 +236,12 @@ export function BuilderPage() {
   const pageCountJobRef = useRef(0)
   const pageCountDelayTimerRef = useRef<number | null>(null)
   const pageCountIdleHandleRef = useRef<number | null>(null)
+  const lastEstimatedResumeRef = useRef<Resume | null>(null)
 
-  const [resume, setResume] = useState<Resume>(() => loadDraft() ?? createEmptyResume())
+  const [resume, setResume] = useState<Resume>(loadInitialResume)
   const [embedArtifacts, setEmbedArtifacts] = useState<EmbedArtifacts | null>(null)
   const [busy, setBusy] = useState(false)
-  const [copyState, setCopyState] = useState('')
+  const [notice, setNotice] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
   const [activeSection, setActiveSection] = useState<SectionId>('basics')
   const [exportOpen, setExportOpen] = useState(false)
   const [openPopover, setOpenPopover] = useState<'info' | 'fixNext' | 'clean' | 'score' | null>(null)
@@ -243,29 +252,62 @@ export function BuilderPage() {
   const [estimatedPages, setEstimatedPages] = useState(1)
   const [isPageEstimateStale, setIsPageEstimateStale] = useState(false)
   const [isPageEstimating, setIsPageEstimating] = useState(false)
-  const [lastEstimateDurationMs, setLastEstimateDurationMs] = useState<number | null>(null)
-  const [lastEstimateSource, setLastEstimateSource] = useState<'blank' | 'cache' | 'idle' | 'urgent' | null>(null)
-  const [lastEstimateUpdatedAt, setLastEstimateUpdatedAt] = useState<number | null>(null)
   const [embedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
   const [embedPreset, setEmbedPreset] = useState<EmbedPreset>('placement')
   const [embedIframeHeight, setEmbedIframeHeight] = useState(1100)
   const [embedShowDownload, setEmbedShowDownload] = useState(false)
+  const [embedPreviewOpen, setEmbedPreviewOpen] = useState(false)
   const isEmbedPanelOpen = embedArtifacts !== null
   const [isMobileLayout, setIsMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches)
-  const [saveState, setSaveState] = useState<'saving' | 'saved'>('saved')
+  const [saveState, setSaveState] = useState<'saving' | 'saved' | 'error'>('saved')
   const [savedAt, setSavedAt] = useState<number>(() => Date.now())
   const [relativeNow, setRelativeNow] = useState<number>(() => Date.now())
+
+  const latestResumeRef = useRef(resume)
+  const noticeTimerRef = useRef<number | null>(null)
+  const isEmptyResume = useMemo(() => isBlankResume(resume), [resume])
+
+  const showNotice = useCallback((message: string, tone: 'info' | 'error' = 'info') => {
+    setNotice({ message, tone })
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current)
+    }
+    noticeTimerRef.current = window.setTimeout(() => {
+      noticeTimerRef.current = null
+      setNotice(null)
+    }, tone === 'error' ? 6000 : 2200)
+  }, [])
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.hash.includes('data=')) {
+      url.hash = ''
+      window.history.replaceState(null, '', `${url.pathname}${url.search}`)
+    }
+  }, [])
+
+  useEffect(() => {
+    latestResumeRef.current = resume
+  }, [resume])
 
   useEffect(() => {
     setSaveState('saving')
     const timer = window.setTimeout(() => {
-      saveDraft({ ...resume, meta: { ...resume.meta, updatedAt: new Date().toISOString() } })
+      const saved = saveDraft(withUpdatedTimestamp(resume))
       setSavedAt(Date.now())
-      setSaveState('saved')
+      setSaveState(saved ? 'saved' : 'error')
     }, DRAFT_SAVE_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
   }, [resume])
+
+  useEffect(() => {
+    const flushDraft = () => {
+      saveDraft(withUpdatedTimestamp(latestResumeRef.current))
+    }
+    window.addEventListener('pagehide', flushDraft)
+    return () => window.removeEventListener('pagehide', flushDraft)
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setRelativeNow(Date.now()), 15000)
@@ -294,7 +336,7 @@ export function BuilderPage() {
   }, [openPopover])
 
   useEffect(() => {
-    localStorage.setItem('cv-embed:public-base-url', normalizeBaseUrl(embedBaseUrl))
+    savePublicBaseUrl(normalizeBaseUrl(embedBaseUrl))
   }, [embedBaseUrl])
 
   useEffect(() => {
@@ -310,11 +352,15 @@ export function BuilderPage() {
 
   useEffect(() => {
     if (!isEmbedPanelOpen) return
-    setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume, {
-      iframeHeight: embedIframeHeight,
-      showDownload: embedShowDownload,
-    }))
-  }, [isEmbedPanelOpen, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
+    try {
+      setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, withUpdatedTimestamp(resume), {
+        iframeHeight: embedIframeHeight,
+        showDownload: embedShowDownload,
+      }))
+    } catch {
+      showNotice('Embed link is too large to generate reliably.', 'error')
+    }
+  }, [isEmbedPanelOpen, embedBaseUrl, resume, embedIframeHeight, embedShowDownload, showNotice])
 
   const clearScheduledPageCount = useCallback(() => {
     if (pageCountDelayTimerRef.current !== null) {
@@ -334,12 +380,12 @@ export function BuilderPage() {
 
   const schedulePageEstimate = useCallback((priority: 'idle' | 'urgent') => {
     clearScheduledPageCount()
+    const scheduledJobId = pageCountJobRef.current + 1
+    pageCountJobRef.current = scheduledJobId
 
     if (isBlankResume(resume)) {
+      lastEstimatedResumeRef.current = resume
       setEstimatedPages(1)
-      setLastEstimateDurationMs(0)
-      setLastEstimateSource('blank')
-      setLastEstimateUpdatedAt(Date.now())
       setIsPageEstimateStale(false)
       setIsPageEstimating(false)
       return
@@ -357,19 +403,15 @@ export function BuilderPage() {
         const cacheKey = JSON.stringify(resume)
         const cached = pageCountCacheRef.current.get(cacheKey)
         if (typeof cached === 'number') {
+          lastEstimatedResumeRef.current = resume
           setEstimatedPages(cached)
-          setLastEstimateDurationMs(0)
-          setLastEstimateSource('cache')
-          setLastEstimateUpdatedAt(Date.now())
           setIsPageEstimateStale(false)
           setIsPageEstimating(false)
           return
         }
 
-        const jobId = pageCountJobRef.current + 1
-        pageCountJobRef.current = jobId
+        const jobId = scheduledJobId
         const perfLabel = `cv-embed-page-estimate-${jobId}`
-        const startedAt = performance.now()
         performance.mark(`${perfLabel}-start`)
 
         try {
@@ -389,24 +431,20 @@ export function BuilderPage() {
 
           performance.mark(`${perfLabel}-end`)
           performance.measure(perfLabel, `${perfLabel}-start`, `${perfLabel}-end`)
-          const duration = Math.max(0, Math.round(performance.now() - startedAt))
 
+          lastEstimatedResumeRef.current = resume
           setEstimatedPages(count)
-          setLastEstimateDurationMs(duration)
-          setLastEstimateSource(priority)
-          setLastEstimateUpdatedAt(Date.now())
           setIsPageEstimateStale(false)
           setIsPageEstimating(false)
-
-          performance.clearMarks(`${perfLabel}-start`)
-          performance.clearMarks(`${perfLabel}-end`)
-          performance.clearMeasures(perfLabel)
         } catch {
           if (pageCountJobRef.current === jobId) {
             setIsPageEstimateStale(false)
             setIsPageEstimating(false)
           }
-          return
+        } finally {
+          performance.clearMarks(`${perfLabel}-start`)
+          performance.clearMarks(`${perfLabel}-end`)
+          performance.clearMeasures(perfLabel)
         }
       }
 
@@ -428,15 +466,6 @@ export function BuilderPage() {
       }
     }, delay)
   }, [clearScheduledPageCount, resume])
-
-  useEffect(() => {
-    // On the mobile layout the preview sits below the form, so a background
-    // page estimate would pull in the ~1.5 MB PDF engine for data most users
-    // never look at while filling the form. Estimate only on demand there.
-    if (isMobileLayout) return
-    schedulePageEstimate('idle')
-    return () => clearScheduledPageCount()
-  }, [clearScheduledPageCount, isMobileLayout, schedulePageEstimate])
 
   useEffect(() => {
     if (exportOpen || isEmbedPanelOpen) {
@@ -479,12 +508,13 @@ export function BuilderPage() {
       ...resume.skills.tools,
       ...resume.skills.other,
     ].map((value) => value.trim().toLowerCase()).filter(Boolean)).size
+    const visibleSections = resume.meta.documentOptions.showSections
 
     const sectionCompletion = {
       summary: hasText(resume.basics.summary),
-      education: resume.education.some((item) => [item.institution, item.degree, item.field].some(hasText)),
-      experience: resume.experience.some((item) => [item.company, item.role, item.location].some(hasText) || item.bullets.some(hasText)),
-      projects: resume.projects.some((item) => [item.title, item.projectLink, item.repoLink].some(hasText) || item.techStack.some(hasText) || item.bullets.some(hasText)),
+      education: resume.education.some((item) => [item.institution, item.degree, item.field, item.cgpa, item.startDate, item.endDate, item.location].some(hasText)),
+      experience: resume.experience.some((item) => [item.company, item.role, item.location, item.startDate, item.endDate].some(hasText) || item.bullets.some(hasText)),
+      projects: resume.projects.some((item) => [item.title, item.projectLink, item.repoLink, item.startDate, item.endDate].some(hasText) || item.techStack.some(hasText) || item.bullets.some(hasText)),
       skills: [
         ...resume.skills.languages,
         ...resume.skills.frameworks,
@@ -498,32 +528,31 @@ export function BuilderPage() {
       publications: resume.publications.some((item) => [item.title, item.venue, item.date, item.url].some(hasText)),
     }
 
-    const basicsCoreReady = hasText(resume.basics.name) && hasText(resume.basics.email) && hasText(resume.basics.phone)
-    const essentialsChecks = [
-      basicsCoreReady,
-      sectionCompletion.education,
-      sectionCompletion.experience || sectionCompletion.projects,
-      uniqueSkillCount >= 3,
-      sectionCompletion.accomplishments,
+    const basicsCoreReady = hasText(resume.basics.name) && (hasText(resume.basics.email) || hasText(resume.basics.phone))
+    const essentialChecks: Array<{ section: BuilderSectionId; ready: boolean }> = [
+      { section: 'basics', ready: basicsCoreReady },
     ]
+    if (visibleSections.education) {
+      essentialChecks.push({ section: 'education', ready: sectionCompletion.education })
+    }
+    if (visibleSections.experience || visibleSections.projects) {
+      essentialChecks.push({
+        section: visibleSections.experience ? 'experience' : 'projects',
+        ready: sectionCompletion.experience || sectionCompletion.projects,
+      })
+    }
+    if (visibleSections.skills) {
+      essentialChecks.push({ section: 'skills', ready: uniqueSkillCount >= 3 })
+    }
 
-    const firstMissingEssentialSection: BuilderSectionId | null =
-      !basicsCoreReady ? 'basics'
-        : !sectionCompletion.education ? 'education'
-          : !(sectionCompletion.experience || sectionCompletion.projects) ? (resume.meta.documentOptions.showSections.experience ? 'experience' : 'projects')
-            : uniqueSkillCount < 3 ? 'skills'
-              : !sectionCompletion.accomplishments ? 'accomplishments'
-                : null
-
-    const visibleSections = Object.entries(resume.meta.documentOptions.showSections)
+    const firstMissingEssentialSection = essentialChecks.find((check) => !check.ready)?.section ?? null
+    const visibleSectionKeys = Object.entries(visibleSections)
       .filter(([, visible]) => visible)
       .map(([section]) => section as keyof typeof sectionCompletion)
-
-    const blocksTotal = 1 + visibleSections.length
-    const blocksDone = (basicsCoreReady ? 1 : 0) + visibleSections.filter((section) => sectionCompletion[section]).length
-
-    const essentialsDone = essentialsChecks.filter(Boolean).length
-    const essentialsTotal = essentialsChecks.length
+    const blocksTotal = 1 + visibleSectionKeys.length
+    const blocksDone = (basicsCoreReady ? 1 : 0) + visibleSectionKeys.filter((section) => sectionCompletion[section]).length
+    const essentialsDone = essentialChecks.filter((check) => check.ready).length
+    const essentialsTotal = essentialChecks.length
 
     return {
       done: blocksDone,
@@ -541,63 +570,69 @@ export function BuilderPage() {
   }, [completion.firstMissingEssentialSection, nextIssueSection])
 
   const fixNextTooltipText = useMemo(() => {
+    const firstIssue = validation.errors[0] ?? validation.warnings[0]
+    if (nextActionSection && firstIssue) {
+      return `Next: ${firstIssue}`
+    }
     if (nextActionSection) {
       return `Next action: complete ${SECTION_LABELS[nextActionSection]} first.`
     }
-    return 'Next action: fix listed validation issues.'
-  }, [nextActionSection])
+    return 'Next action: fix the listed validation issue.'
+  }, [nextActionSection, validation.errors, validation.warnings])
 
-  useEffect(() => {
-    if (!import.meta.env.DEV) return
-    const expected = completion.firstMissingEssentialSection ?? nextIssueSection
-    if (expected !== nextActionSection) {
-      console.warn('[cv-embed] next action mismatch detected', {
-        expected,
-        nextActionSection,
-      })
-    }
-  }, [completion.firstMissingEssentialSection, nextActionSection, nextIssueSection])
 
   const saveStatusText = saveState === 'saving'
-    ? 'Saving draft...'
-    : `Saved ${formatRelativeTime(savedAt, relativeNow)}`
+    ? 'Saving draft…'
+    : saveState === 'error'
+      ? 'Draft not saved'
+      : `Saved ${formatRelativeTime(savedAt, relativeNow)}`
 
-  const pageIndicatorText = isPageEstimating && isPageEstimateStale
-    ? `Est. pages: ${estimatedPages}`
-    : `Pages: ${estimatedPages}`
-
-  const pageIndicatorTitle = (() => {
-    if (isPageEstimating) {
-      return 'Estimated A4 pages in export'
-    }
-
-    if (lastEstimateSource && typeof lastEstimateDurationMs === 'number' && lastEstimateUpdatedAt) {
-      return `Estimated A4 pages in export • ${lastEstimateSource} • ${lastEstimateDurationMs}ms • updated ${formatRelativeTime(lastEstimateUpdatedAt, relativeNow)}`
-    }
-
-    return 'Estimated A4 pages in export'
-  })()
+  const hasPageEstimate = isEmptyResume || lastEstimatedResumeRef.current === resume
+  const pageIndicatorText = isEmptyResume
+    ? 'Preview pages: 1'
+    : hasPageEstimate
+      ? `${isPageEstimating && isPageEstimateStale ? 'Est. PDF pages' : 'PDF pages'}: ${estimatedPages}`
+      : 'PDF pages: not checked'
+  const pageIndicatorTitle = isEmptyResume
+    ? 'An empty CV renders on one logical page.'
+    : 'Estimated A4 pages in the PDF export. Checking starts when you open export or embed tools.'
 
   const onImportJson = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
+    if (file.size > MAX_PORTABLE_PAYLOAD_CHARS) {
+      showNotice('Import failed. Choose a CV-Embed JSON file smaller than 1 MB.', 'error')
+      return
+    }
+
     try {
-      const next = normalizeResume(JSON.parse(await file.text()) as Resume)
-      setResume(next); setEmbedArtifacts(null)
-    } catch { alert('Invalid JSON') }
+      const next = normalizeResume(JSON.parse(await file.text()) as unknown)
+      setResume(next)
+      setEmbedArtifacts(null)
+      showNotice('Resume imported.')
+    } catch {
+      showNotice('Import failed. Choose a valid CV-Embed JSON export.', 'error')
+    }
   }
 
   const createEmbedLink = useCallback(() => {
     if (embedArtifacts) {
       setEmbedArtifacts(null)
+      setEmbedPreviewOpen(false)
       return
     }
 
-    setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, resume, {
-      iframeHeight: embedIframeHeight,
-      showDownload: embedShowDownload,
-    }))
-  }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload])
+    try {
+      setEmbedArtifacts(buildEmbedArtifacts(embedBaseUrl, withUpdatedTimestamp(resume), {
+        iframeHeight: embedIframeHeight,
+        showDownload: embedShowDownload,
+      }))
+      showNotice('Embed link generated.')
+    } catch {
+      showNotice('Embed link is too large to generate reliably.', 'error')
+    }
+  }, [embedArtifacts, embedBaseUrl, resume, embedIframeHeight, embedShowDownload, showNotice])
 
   // Header "Embed" button toggles the panel (App dispatches this event).
   useEffect(() => {
@@ -605,6 +640,12 @@ export function BuilderPage() {
     window.addEventListener('cvembed:toggle-embed', handler)
     return () => window.removeEventListener('cvembed:toggle-embed', handler)
   }, [createEmbedLink])
+
+  useEffect(() => {
+    const handler = () => fileRef.current?.click()
+    window.addEventListener('cvembed:import-json', handler)
+    return () => window.removeEventListener('cvembed:import-json', handler)
+  }, [])
 
   const onEmbedPresetChange = (preset: EmbedPreset) => {
     setEmbedPreset(preset)
@@ -628,42 +669,53 @@ export function BuilderPage() {
     try {
       setBusy(true)
       const { downloadResumePdf } = await import('../../pdf/pdfRenderer')
-      await downloadResumePdf(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.pdf`)
+      await downloadResumePdf(resume, createDownloadFileName(resume.basics.name, 'pdf'))
+      showNotice('PDF downloaded.')
+    } catch (error) {
+      if (error instanceof Error && error.name === 'PdfUnsupportedCharactersError') {
+        showNotice('PDF cannot render some characters in this CV. Use DOCX or replace the unsupported characters.', 'error')
+      } else {
+        showNotice('PDF export failed. Your draft is unchanged.', 'error')
+      }
     } finally {
       setBusy(false)
     }
-  }, [resume])
+  }, [resume, showNotice])
 
   const onDownloadDocx = useCallback(async () => {
     try {
       setBusy(true)
       const { downloadResumeDocx } = await import('../../docx/docxRenderer')
-      await downloadResumeDocx(resume, `${(resume.basics.name || 'resume').replace(/\s+/g, '_')}.docx`)
+      await downloadResumeDocx(resume, createDownloadFileName(resume.basics.name, 'docx'))
+      showNotice('DOCX downloaded.')
+    } catch {
+      showNotice('DOCX export failed. Your draft is unchanged.', 'error')
     } finally {
       setBusy(false)
     }
-  }, [resume])
+  }, [resume, showNotice])
 
   const onDownloadJson = useCallback(() => {
-    downloadJson(resume)
-  }, [resume])
-
-  const copyToastTimerRef = useRef<number | null>(null)
-  const copyTo = useCallback(async (label: string, value: string) => {
-    await navigator.clipboard.writeText(value)
-    setCopyState(`${label} copied`)
-    if (copyToastTimerRef.current !== null) {
-      window.clearTimeout(copyToastTimerRef.current)
+    try {
+      downloadJson(withUpdatedTimestamp(resume), createDownloadFileName(resume.basics.name, 'json'))
+      showNotice('JSON downloaded.')
+    } catch {
+      showNotice('JSON export failed. Your draft is unchanged.', 'error')
     }
-    copyToastTimerRef.current = window.setTimeout(() => {
-      copyToastTimerRef.current = null
-      setCopyState('')
-    }, 1800)
-  }, [])
+  }, [resume, showNotice])
+
+  const copyTo = useCallback(async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      showNotice(`${label} copied.`)
+    } catch {
+      showNotice(`Could not copy ${label}.`, 'error')
+    }
+  }, [showNotice])
 
   useEffect(() => () => {
-    if (copyToastTimerRef.current !== null) {
-      window.clearTimeout(copyToastTimerRef.current)
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current)
     }
   }, [])
 
@@ -699,22 +751,11 @@ export function BuilderPage() {
   ] : []
 
   const scrollTo = (id: SectionId) => {
-    // Summary lives inside the Basics panel; jump there and focus the field.
-    if (id === 'summary') {
-      setActiveSection('basics')
-      if (isMobileLayout) setMobileView('edit')
-      requestAnimationFrame(() => {
-        document.getElementById('section-basics')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        document.querySelector<HTMLTextAreaElement>('#section-basics textarea')?.focus()
-      })
-      return
-    }
-
     // Hidden sections have no panel to scroll to.
     if (id !== 'document-options' && !resume.meta.documentOptions.showSections[id as ResumeSectionKey]) return
     setActiveSection(id)
     if (isMobileLayout) setMobileView('edit')
-    document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest' })
   }
 
   const sectionCls = (id: SectionId) =>
@@ -762,8 +803,8 @@ export function BuilderPage() {
   const navSections: NavSection[] = SECTION_NAV.map((s) => ({
     id: s.id,
     label: s.label,
-    active: activeSection === s.id || (s.id === 'summary' && activeSection === 'basics'),
-    hidden: s.id !== 'document-options' && s.id !== 'summary' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
+    active: activeSection === s.id,
+    hidden: s.id !== 'document-options' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
   }))
 
   // Only render editor panels for sections enabled in the resume; hidden
@@ -785,7 +826,7 @@ export function BuilderPage() {
       activities: <ActivitiesSection activities={resume.activities} onChange={(activities) => setResume((p) => ({ ...p, activities }))} />,
       volunteering: <VolunteeringSection volunteering={resume.volunteering} onChange={(volunteering) => setResume((p) => ({ ...p, volunteering }))} />,
       publications: <PublicationsSection publications={resume.publications} onChange={(publications) => setResume((p) => ({ ...p, publications }))} />,
-      summary: null,
+      summary: <SummarySection summary={resume.basics.summary} onChange={(summary) => setResume((p) => ({ ...p, basics: { ...p.basics, summary } }))} />,
     }
 
     return order
@@ -803,7 +844,10 @@ export function BuilderPage() {
 
     setActiveSection(section)
     requestAnimationFrame(() => {
-      document.getElementById(`section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      const target = document.getElementById(`section-${section}`)
+      target?.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest' })
+      const field = target?.querySelector<HTMLElement>('input, textarea, select')
+      ;(field ?? target)?.focus({ preventScroll: true })
     })
   }, [nextActionSection, resume.meta.documentOptions.showSections])
 
@@ -839,13 +883,18 @@ export function BuilderPage() {
   }, [busy, createEmbedLink, jumpToFirstIssue, onDownloadPdf])
 
   return (
-    <main className={`app-main two-pane ${isMobileLayout ? 'is-mobile-layout' : ''}`}>
+    <main id="main-content" className={`app-main two-pane ${isMobileLayout ? 'is-mobile-layout' : ''}`}>
+      {notice ? (
+        <div className={`operation-notice ${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
+          {notice.message}
+        </div>
+      ) : null}
+      <input ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="Import resume JSON" onChange={onImportJson} />
       {isMobileLayout ? (
-        <div className="mobile-view-toggle" role="tablist" aria-label="Builder view">
+        <div className="mobile-view-toggle" role="group" aria-label="Builder view">
           <button
             type="button"
-            role="tab"
-            aria-selected={mobileView === 'edit'}
+            aria-pressed={mobileView === 'edit'}
             className={`mobile-view-tab ${mobileView === 'edit' ? 'active' : ''}`}
             onClick={() => setMobileView('edit')}
           >
@@ -853,8 +902,7 @@ export function BuilderPage() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={mobileView === 'preview'}
+            aria-pressed={mobileView === 'preview'}
             className={`mobile-view-tab ${mobileView === 'preview' ? 'active' : ''}`}
             onClick={() => setMobileView('preview')}
           >
@@ -865,8 +913,6 @@ export function BuilderPage() {
 
       {!isMobileLayout || mobileView === 'edit' ? (
       <section className={`left-pane ${isMobileLayout ? 'mobile-pane-enter' : ''}`}>
-        <input ref={fileRef} type="file" accept="application/json" hidden onChange={onImportJson} />
-
         <div className="completion-strip" ref={popoverZoneRef} title="Readiness based on section coverage, essentials, and validation state">
           <div className="completion-head">
             <div className="completion-title-group">
@@ -875,16 +921,16 @@ export function BuilderPage() {
                 <span className="completion-inline-tools">
                   <span
                     className={`completion-info-wrap${openPopover === 'info' ? ' is-open' : ''}`}
-                    tabIndex={0}
-                    aria-label="Readiness details"
                   >
                     <button
                       type="button"
                       className="completion-info-btn"
+                      aria-label="Readiness details"
+                      aria-controls="readiness-details"
                       aria-expanded={openPopover === 'info'}
                       onClick={() => setOpenPopover((p) => (p === 'info' ? null : 'info'))}
                     >i</button>
-                    <span className="completion-pill-popover completion-info-popover" role="tooltip">
+                    <span id="readiness-details" className="completion-pill-popover completion-info-popover" role="tooltip" aria-hidden={openPopover !== 'info'}>
                       {completion.done}/{completion.total} sections complete • Essentials {completion.essentialsDone}/{completion.essentialsTotal}
                     </span>
                   </span>
@@ -895,14 +941,13 @@ export function BuilderPage() {
               {issueSummary.total > 0 ? (
                 <div
                   className={`completion-pill-wrap${openPopover === 'fixNext' ? ' is-open' : ''}`}
-                  tabIndex={0}
-                  aria-label="Issue guidance"
                 >
                   <button
                     type="button"
                     className={`completion-pill completion-pill-action completion-pill-compact ${issueSummary.severity === 'errors' ? 'error' : 'warn'}`}
                     title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
                     aria-label="Fix next issue"
+                    aria-controls="fix-next-details"
                     aria-expanded={openPopover === 'fixNext'}
                     onClick={() => {
                       if (openPopover === 'fixNext') {
@@ -915,25 +960,25 @@ export function BuilderPage() {
                   >
                     <IconAlertTriangle size={10} /> {issueSummary.label}
                   </button>
-                  <div className="completion-pill-popover" role="tooltip">
+                  <div id="fix-next-details" className="completion-pill-popover" role="tooltip" aria-hidden={openPopover !== 'fixNext'}>
                     {fixNextTooltipText}
                   </div>
                 </div>
               ) : (
                 <div
                   className={`completion-pill-wrap${openPopover === 'clean' ? ' is-open' : ''}`}
-                  tabIndex={0}
-                  aria-label="Issue guidance"
                 >
                   <button
                     type="button"
                     className="completion-pill completion-pill-compact ok"
+                    aria-label="No validation issues"
+                    aria-controls="clean-details"
                     aria-expanded={openPopover === 'clean'}
                     onClick={() => setOpenPopover((p) => (p === 'clean' ? null : 'clean'))}
                   >
                     <IconCheck size={10} /> Clean
                   </button>
-                  <div className="completion-pill-popover" role="tooltip">
+                  <div id="clean-details" className="completion-pill-popover" role="tooltip" aria-hidden={openPopover !== 'clean'}>
                     No validation issues right now. Next action: add measurable outcomes to improve overall quality.
                   </div>
                 </div>
@@ -944,6 +989,7 @@ export function BuilderPage() {
           <div className="completion-track" aria-hidden>
             <span className="completion-fill" style={{ width: `${completion.percent}%` }} />
           </div>
+          {isEmptyResume ? <p className="completion-empty-note">Add your name and contact details to begin.</p> : null}
         </div>
 
         {embedArtifacts ? (
@@ -1023,17 +1069,21 @@ export function BuilderPage() {
                 </div>
               ))}
             </div>
-            <details className="embed-preview-details">
+            <details
+              className="embed-preview-details"
+              onToggle={(event) => setEmbedPreviewOpen(event.currentTarget.open)}
+            >
               <summary>Preview how it looks embedded</summary>
-              <iframe
-                src={embedArtifacts.portableUrl}
-                title="Embed preview"
-                className="embed-preview-frame"
-                style={{ height: Math.min(embedIframeHeight, 640) }}
-                loading="lazy"
-              />
+              {embedPreviewOpen ? (
+                <iframe
+                  src={embedArtifacts.portableUrl}
+                  title="Embed preview"
+                  className="embed-preview-frame"
+                  style={{ height: Math.min(embedIframeHeight, 640) }}
+                  loading="lazy"
+                />
+              ) : null}
             </details>
-            {copyState ? <span className="copy-toast"><IconCheck size={11} /> {copyState}</span> : null}
           </div>
         ) : null}
 
@@ -1060,7 +1110,7 @@ export function BuilderPage() {
           onFormatClose={() => setFormatOpen(false)}
         />
 
-        <div id="section-basics" className={sectionCls('basics')} onMouseDownCapture={() => setActiveSection('basics')} onFocusCapture={() => setActiveSection('basics')}
+        <div id="section-basics" tabIndex={-1} className={sectionCls('basics')} onMouseDownCapture={() => setActiveSection('basics')} onFocusCapture={() => setActiveSection('basics')}
 >
           <BasicsSection
             basics={resume.basics}
@@ -1084,6 +1134,7 @@ export function BuilderPage() {
           <div
             key={key}
             id={`section-${key}`}
+            tabIndex={-1}
             className={sectionCls(key as SectionId)}
             onMouseDownCapture={() => setActiveSection(key as SectionId)}
             onFocusCapture={() => setActiveSection(key as SectionId)}
@@ -1106,21 +1157,21 @@ export function BuilderPage() {
             >
               {pageIndicatorText}
             </span>
-            <span className={`save-indicator ${saveState === 'saving' ? 'saving' : 'saved'}`} title="Draft status">
+            <span className={`save-indicator ${saveState}`} title="Draft status" role="status" aria-live="polite">
               {saveStatusText}
             </span>
           </div>
           <div className="preview-head-actions">
             <div className="toolbar-strip toolbar-strip-right">
-              <button type="button" className="tool-btn" title="Import resume JSON" onClick={() => fileRef.current?.click()}><IconUpload size={14} /></button>
+              <button type="button" className="tool-btn" title="Import resume JSON" aria-label="Import resume JSON" onClick={() => fileRef.current?.click()}><IconUpload size={14} /></button>
               <div className="export-menu" ref={exportRef}>
-                <button type="button" className="tool-btn" title="Export resume" onClick={() => setExportOpen((o) => !o)} disabled={busy}>
+                <button type="button" className="tool-btn" title="Export resume" aria-label="Export resume" aria-expanded={exportOpen} onClick={() => setExportOpen((o) => !o)} disabled={busy}>
                   <IconDownload size={14} /><IconChevronDown size={10} />
                 </button>
                 {exportOpen ? (
                   <div className="export-dropdown">
-                    <button type="button" onClick={async () => { await onDownloadPdf(); setExportOpen(false) }}><IconFileText size={14} /> PDF</button>
-                    <button type="button" onClick={async () => { await onDownloadDocx(); setExportOpen(false) }}><IconFileText size={14} /> DOCX</button>
+                    <button type="button" disabled={busy} onClick={async () => { await onDownloadPdf(); setExportOpen(false) }}><IconFileText size={14} /> PDF</button>
+                    <button type="button" disabled={busy} onClick={async () => { await onDownloadDocx(); setExportOpen(false) }}><IconFileText size={14} /> DOCX</button>
                     <button type="button" onClick={() => { onDownloadJson(); setExportOpen(false) }}><IconBraces size={14} /> JSON</button>
                   </div>
                 ) : null}
@@ -1128,19 +1179,19 @@ export function BuilderPage() {
               <div
                 className={`score-hover-wrap${openPopover === 'score' ? ' is-open' : ''}`}
                 ref={scoreZoneRef}
-                tabIndex={0}
-                aria-label="Scoring rubric"
               >
                 <button
                   type="button"
                   className="score-pill"
                   title={qualityScoreLabel}
+                  aria-label={qualityScoreLabel}
+                  aria-controls="scoring-rubric"
                   aria-expanded={openPopover === 'score'}
                   onClick={() => setOpenPopover((p) => (p === 'score' ? null : 'score'))}
                 >
                   {qualityScoreLabel}
                 </button>
-                <div className="score-help-popover" role="dialog" aria-label="Scoring rubric">
+                <div id="scoring-rubric" className="score-help-popover" role="group" aria-label="Scoring rubric" aria-hidden={openPopover !== 'score'}>
                   <p className="score-help-title">Scoring Rubric</p>
                   <ul>
                     <li><strong>Quality:</strong> errors, warnings, and writing signals</li>

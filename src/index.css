@@ -13,8 +13,8 @@
   --text:         #f3f5fb;
   --text-2:       #c1c7dc;
   --text-3:       #8b93b2;
-  --accent:       #7c5cfc;
-  --accent-hover: #9b82fd;
+  --accent:       #a996ff;
+  --accent-hover: #c4b8ff;
   --accent-dim:   rgba(124, 92, 252, 0.10);
   --accent-mid:   rgba(124, 92, 252, 0.22);
   --green:        #36d399;
@@ -32,6 +32,7 @@
   line-height: 1.45;
   color: var(--text);
   background: var(--bg);
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -40,12 +41,29 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 
-body { margin: 0; min-width: 320px; background: var(--bg); }
+body { margin: 0; min-width: 0; background: var(--bg); }
 
 a { color: var(--accent-hover); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ═══════════════════════ Base Button Reset ═══════════════════════ */
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-150%);
+  padding: 8px 10px;
+  border-radius: var(--r);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
 
 button {
   all: unset;
@@ -54,17 +72,28 @@ button {
   align-items: center;
   font-family: inherit;
   box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
 
 /* ═══════════════════════ App Shell ═══════════════════════ */
 
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.app-shell.embed-shell { min-height: 0; }
+.app-shell.embed-shell .app-main { flex: 0 0 auto; }
 
 .app-header {
   flex-shrink: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 0 20px;
+  padding: 0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
   height: 46px;
   display: flex;
   align-items: center;
@@ -80,7 +109,15 @@ button {
   gap: 14px;
 }
 
-.header-embed-btn {
+.app-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.header-embed-btn,
+.header-import-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -97,7 +134,8 @@ button {
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 
-.header-embed-btn:hover {
+.header-embed-btn:hover,
+.header-import-btn:hover {
   color: var(--text);
   border-color: var(--accent-mid);
   background: var(--accent-dim);
@@ -654,14 +692,20 @@ button.score-pill {
   overflow: hidden;
 }
 
-.copy-toast {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: 'Azeret Mono', monospace;
-  font-size: 10px;
-  color: var(--green);
-  font-weight: 600;
+.operation-notice {
+  grid-column: 1 / -1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.operation-notice.error {
+  border-color: rgba(239, 95, 95, 0.35);
+  background: var(--red-dim);
+  color: var(--red);
 }
 
 .embed-tip {
@@ -825,6 +869,12 @@ button.score-pill {
   font-family: 'Azeret Mono', monospace;
   font-size: 9px;
   color: var(--text-3);
+}
+
+.completion-empty-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
 }
 
 .completion-pills {
@@ -1031,6 +1081,7 @@ button.score-pill {
   width: min(280px, calc(100vw - 28px));
   max-height: min(420px, calc(100vh - 120px));
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface-3);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -1070,6 +1121,16 @@ button.score-pill {
 
 .section-shell {
   transition: opacity 0.18s ease;
+  scroll-margin-top: 64px;
+}
+
+.section-empty {
+  margin: 0;
+  padding: 12px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+  color: var(--text-3);
+  font-size: 12px;
 }
 
 .section-shell.is-active > .panel {
@@ -1169,7 +1230,8 @@ button.score-pill {
   z-index: 2;
 }
 
-.card:hover .card-close { opacity: 1; }
+.card:hover .card-close,
+.card-close:focus-visible { opacity: 1; }
 .card-close:hover { color: var(--red); background: var(--red-dim); }
 
 /* ═══════════════════════ Form Controls ═══════════════════════ */
@@ -1178,7 +1240,7 @@ label {
   display: grid;
   gap: 3px;
   font-family: 'Azeret Mono', monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1228,6 +1290,13 @@ input[type="color"] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+}
+
+.field-help {
+  margin: 8px 0 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .field-stack {
@@ -1331,7 +1400,8 @@ input[type="color"] {
   transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
 
-.bullet-row:hover .bullet-dismiss { opacity: 1; }
+.bullet-row:hover .bullet-dismiss,
+.bullet-dismiss:focus-visible { opacity: 1; }
 .bullet-dismiss:hover { color: var(--red); background: var(--red-dim); }
 
 .add-inline {
@@ -1430,6 +1500,13 @@ h4.skill-cat-title { margin: 0 0 6px; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.preview-head-main > .section-title {
+  flex: 0 0 auto;
+  min-width: max-content;
 }
 
 .page-indicator {
@@ -1475,10 +1552,16 @@ h4.skill-cat-title { margin: 0 0 6px; }
   background: var(--orange-dim);
 }
 
+.save-indicator.error {
+  color: var(--red);
+  background: var(--red-dim);
+}
+
 .preview-head-actions {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .toolbar-strip-right {
@@ -1549,7 +1632,7 @@ h4.skill-cat-title { margin: 0 0 6px; }
 
 .resume-template.template-compact .resume-compact-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.55fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
   text-align: left;
@@ -1566,15 +1649,17 @@ h4.skill-cat-title { margin: 0 0 6px; }
   justify-content: flex-start;
 }
 
-.resume-template.template-compact .resume-compact-meta {
-  display: grid;
-  gap: 4px;
-  justify-items: end;
-  text-align: right;
+.resume-template.header-center.template-compact .resume-compact-header {
+  text-align: center;
+  justify-items: center;
 }
 
-.resume-template.template-compact .resume-compact-meta p {
-  margin: 0;
+.resume-template.header-center.template-compact .resume-compact-header .link-row {
+  justify-content: center;
+}
+
+.resume-template.template-compact .resume-compact-header-spacer {
+  display: none;
 }
 
 .resume-template.template-compact .resume-compact-grid {
@@ -1619,10 +1704,22 @@ h4.skill-cat-title { margin: 0 0 6px; }
 .resume-template.header-left .link-row      { justify-content: flex-start; }
 .link-row         { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 
+.resume-template a {
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+
 .resume-template section { margin-top: 14px; border-top: 1px solid #e6e9f2; padding-top: 8px; }
 .resume-template p       { margin: 3px 0; }
-.resume-row              { display: flex; justify-content: space-between; gap: 10px; }
+.resume-row              { display: flex; justify-content: space-between; gap: 10px; min-width: 0; }
+.resume-row > div         { min-width: 0; }
 .resume-row-meta         { white-space: nowrap; color: #4b5563; }
+.resume-template,
+.resume-template p,
+.resume-template li,
+.resume-template a,
+.resume-item,
+.resume-row > div { overflow-wrap: anywhere; }
 .resume-template ul      { margin: 5px 0; padding-left: 18px; list-style: none; }
 .resume-template li      { margin: 2px 0; }
 .resume-skill-grid       { display: grid; gap: 3px; }
@@ -1994,6 +2091,21 @@ h4.skill-cat-title { margin: 0 0 6px; }
 }
 
 @media (hover: none), (pointer: coarse) {
+  .card-close,
+  .bullet-dismiss {
+    opacity: 1;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .ghost-add,
+  .order-btn,
+  .embed-icon-btn,
+  .completion-info-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
   /* Hover is unavailable on touch devices; popovers open via tap instead
      (the .is-open class is set by BuilderPage popover state). */
   .score-help-popover,

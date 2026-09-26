@@ -5,11 +5,11 @@ import { MinimalTemplate } from './Minimal'
 interface TemplateRendererProps {
   resume: Resume
   primaryColor?: string
-  density?: 'normal' | 'compact'
+  density?: 'comfortable' | 'compact' | 'relaxed'
 }
 
-export function TemplateRenderer({ resume, primaryColor, density = 'normal' }: TemplateRendererProps) {
-  const densityMode = density === 'compact' ? 'compact' : resume.meta.documentOptions.density
+export function TemplateRenderer({ resume, primaryColor, density }: TemplateRendererProps) {
+  const densityMode = density ?? resume.meta.documentOptions.density
 
   if (resume.meta.template === 'compact') {
     return <CompactTemplate resume={resume} primaryColor={primaryColor} densityMode={densityMode} />

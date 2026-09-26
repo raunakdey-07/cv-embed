@@ -13,7 +13,7 @@ test.describe('Builder QoL flows', () => {
     await expect(fixNext).toBeVisible()
 
     await fixNext.hover()
-    await expect(page.locator('.completion-pill-wrap').filter({ has: fixNext }).getByRole('tooltip')).toContainText('Next action:')
+    await expect(page.locator('.completion-pill-wrap').filter({ has: fixNext }).locator('.completion-pill-popover')).toContainText('Next')
 
     await fixNext.click()
     await expect(page.locator('.section-shell.is-active').first()).toBeVisible()
@@ -31,8 +31,8 @@ test.describe('Builder QoL flows', () => {
     // Mobile shows an Edit/Preview toggle; Edit is the default view.
     const toggle = page.locator('.mobile-view-toggle')
     await expect(toggle).toBeVisible()
-    const editTab = toggle.getByRole('tab', { name: 'Edit' })
-    const previewTab = toggle.getByRole('tab', { name: 'Preview' })
+    const editTab = toggle.getByRole('button', { name: 'Edit' })
+    const previewTab = toggle.getByRole('button', { name: 'Preview' })
     await expect(editTab).toHaveClass(/active/)
     await expect(page.locator('.left-pane')).toBeVisible()
     await expect(page.locator('.right-pane')).toHaveCount(0)
