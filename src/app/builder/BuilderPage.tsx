@@ -673,7 +673,10 @@ export function BuilderPage() {
       showNotice('PDF downloaded.')
     } catch (error) {
       if (error instanceof Error && error.name === 'PdfUnsupportedCharactersError') {
-        showNotice('PDF cannot render some characters in this CV. Use DOCX or replace the unsupported characters.', 'error')
+        const characters = 'characters' in error && Array.isArray(error.characters)
+          ? (error.characters as string[]).slice(0, 6).join(' ')
+          : ''
+        showNotice(`PDF cannot render ${characters || 'some characters'} in this CV. Use DOCX or replace the unsupported characters.`, 'error')
       } else {
         showNotice('PDF export failed. Your draft is unchanged.', 'error')
       }

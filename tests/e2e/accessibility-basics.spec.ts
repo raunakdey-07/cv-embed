@@ -90,6 +90,24 @@ test('unsafe resume links are not rendered as active links', async ({ page, isMo
   await expect(page.locator('.resume-template a[href^="javascript:"]')).toHaveCount(0)
 })
 
+test('reduced motion uses non-animated section scrolling', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.addInitScript(() => {
+    const behaviors: string[] = []
+    ;(window as unknown as { __cvScrollBehaviors: string[] }).__cvScrollBehaviors = behaviors
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = function (options?: ScrollIntoViewOptions) {
+      behaviors.push(options?.behavior ?? 'auto')
+      return original.call(this, options)
+    }
+  })
+
+  await page.goto('/builder')
+  await page.locator('.nav-tab', { hasText: 'Summary' }).click()
+  await expect.poll(async () => page.evaluate(() => (window as unknown as { __cvScrollBehaviors?: string[] }).__cvScrollBehaviors ?? [])).toContain('auto')
+})
+
 test('unknown routes explain how to recover', async ({ page }) => {
   await page.goto('/not-a-real-route')
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()

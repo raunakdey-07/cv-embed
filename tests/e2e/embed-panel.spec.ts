@@ -3,6 +3,9 @@ import { test, expect } from '@playwright/test'
 test('embed panel: opens, shows friendly snippets, live preview works', async ({ page, isMobile }) => {
   test.skip(isMobile, 'desktop-only flow')
 
+  const requestUrls: string[] = []
+  page.on('request', (request) => requestUrls.push(request.url()))
+
   await page.goto('/builder')
   await expect(page.getByText('Resume Readiness')).toBeVisible()
 
@@ -49,6 +52,8 @@ test('embed panel: opens, shows friendly snippets, live preview works', async ({
   await strip.locator('.embed-preview-details summary').click()
   const frame = page.frameLocator('.embed-preview-frame')
   await expect(frame.locator('.resume-template')).toBeVisible({ timeout: 15_000 })
+  expect(requestUrls.some((url) => url.includes('/embed/portable'))).toBe(true)
+  expect(requestUrls.some((url) => url.includes('data='))).toBe(false)
 
   // Preset switch updates height + download flag.
   await strip.locator('.embed-preset-select').selectOption('portfolio')

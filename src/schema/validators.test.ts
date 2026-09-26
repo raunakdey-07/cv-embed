@@ -17,6 +17,17 @@ function createStudentResume(): Resume {
   return resume
 }
 
+function createRepresentativeResume(): Resume {
+  const resume = createEmptyResume()
+  resume.basics.name = 'Representative User'
+  resume.basics.email = 'representative@example.com'
+  resume.basics.summary = 'Engineer who builds reliable products and measurable outcomes.'
+  resume.education = [{ institution: 'School', degree: 'BS', field: 'CS', cgpa: '', startDate: '', endDate: '', location: '' }]
+  resume.projects = [{ title: 'Project', projectLink: '', repoLink: '', techStack: [], startDate: '', endDate: '', bullets: ['Built a useful tool.'] }]
+  resume.skills.languages = ['TypeScript', 'React', 'Node']
+  return resume
+}
+
 describe('validateResume', () => {
   it('scores a genuinely empty CV as zero', () => {
     const result = validateResume(createEmptyResume())
@@ -105,5 +116,68 @@ describe('validateResume', () => {
     expect(result.valid).toBe(false)
     expect(result.errors.length).toBeGreaterThan(0)
     expect(result.score).toBe(0)
+  })
+})
+
+describe('representative quality-score behavior', () => {
+  it('increases from sparse to balanced and reaches 100 with a valid link', () => {
+    const sparse = createEmptyResume()
+    sparse.basics.name = 'Sparse User'
+    sparse.basics.email = 'sparse@example.com'
+    const balanced = createRepresentativeResume()
+    const highQuality = structuredClone(balanced)
+    highQuality.basics.links = [{ label: 'Portfolio', url: 'https://example.com' }]
+
+    const sparseResult = validateResume(sparse)
+    const balancedResult = validateResume(balanced)
+    const highQualityResult = validateResume(highQuality)
+
+    expect(balancedResult.score).toBeGreaterThan(sparseResult.score)
+    expect(balancedResult.score).toBeLessThan(100)
+    expect(highQualityResult.score).toBe(100)
+  })
+
+  it('keeps long or warning-heavy content below the clean balanced score', () => {
+    const balanced = createRepresentativeResume()
+    const long = structuredClone(balanced)
+    long.projects[0].bullets = ['X'.repeat(181)]
+    const warnings = structuredClone(balanced)
+    warnings.basics.links = [{ label: 'Portfolio', url: 'javascript:alert(1)' }]
+
+    expect(validateResume(long).score).toBeLessThan(validateResume(balanced).score)
+    expect(validateResume(warnings).score).toBeLessThan(validateResume(balanced).score)
+  })
+
+  it('does not penalize meaningful content in additional visible sections', () => {
+    const manySections = createRepresentativeResume()
+    manySections.meta.documentOptions.showSections.certifications = true
+    manySections.meta.documentOptions.showSections.accomplishments = true
+    manySections.meta.documentOptions.showSections.activities = true
+    manySections.meta.documentOptions.showSections.volunteering = true
+    manySections.meta.documentOptions.showSections.publications = true
+    manySections.basics.links = [{ label: 'Portfolio', url: 'https://example.com' }]
+    manySections.certifications = [{ title: 'Certificate', issuer: 'Issuer', date: '', credentialId: '', credentialUrl: '' }]
+    manySections.accomplishments = [{ title: 'Award', organization: 'Org', location: '', startDate: '', endDate: '', bullets: [] }]
+    manySections.activities = [{ role: 'Mentor', organization: 'Community', location: '', startDate: '', endDate: '', referenceUrl: '' }]
+    manySections.volunteering = [{ role: 'Coach', organization: 'Club', location: '', startDate: '', endDate: '', bullets: [] }]
+    manySections.publications = [{ title: 'Paper', venue: 'Journal', date: '', url: '' }]
+
+    expect(validateResume(manySections).score).toBe(100)
+  })
+
+  it('treats a focused CV with hidden sections as complete within its visible scope', () => {
+    const focused = createEmptyResume()
+    focused.basics.name = 'Focused User'
+    focused.basics.email = 'focused@example.com'
+    focused.meta.documentOptions.showSections.summary = false
+    focused.meta.documentOptions.showSections.education = false
+    focused.meta.documentOptions.showSections.experience = false
+    focused.meta.documentOptions.showSections.projects = false
+    focused.meta.documentOptions.showSections.skills = false
+
+    const result = validateResume(focused)
+    expect(result.warnings).toEqual([])
+    expect(result.errors).toEqual([])
+    expect(result.score).toBe(86)
   })
 })
