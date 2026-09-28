@@ -101,6 +101,7 @@ npm run bench:server # Run local Chromium benchmark server
 
 ## SDK v2 Options
 
+- `baseUrl`: origin that serves the embed route. **Required unless `sdk.js` is loaded by a classic `<script>` tag.** The SDK captures its own origin at load time via `document.currentScript`, which is null when the file is bundled or evaluated. Without a resolvable origin the embed falls back to the host page origin and the frame loads a 404, so pass `baseUrl` explicitly whenever you load the SDK through a bundler.
 - `options.autoHeight` (default `true`): auto-resize iframe based on embed content.
 - `options.mode`: `preview | guided | edit`.
 - `options.debug`: render integration diagnostics inside embed.

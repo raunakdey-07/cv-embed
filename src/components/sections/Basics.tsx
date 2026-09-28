@@ -23,6 +23,10 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
     onChange({ ...basics, links: [...basics.links, { label: 'LinkedIn', url: '' }] })
   }
 
+  // Removing the last link keeps one empty row so the add control has
+  // somewhere to live. That row is not a link, so it must not be counted.
+  const linkCount = basics.links.filter((link) => link.url.trim().length > 0).length
+
   const removeLink = (index: number) => {
     const next = basics.links.filter((_, linkIndex) => linkIndex !== index)
     onChange({ ...basics, links: next.length > 0 ? next : [{ label: '', url: '' }] })
@@ -59,7 +63,7 @@ export function BasicsSection({ basics, linkDisplay, onLinkDisplayChange, onChan
 
       <div className="section-head sub">
         <h3 className="section-title">Links</h3>
-        <span className="count-badge">{basics.links.length}</span>
+        <span className="count-badge">{linkCount}</span>
         <label className="inline-select-wrap">
           <span className="inline-select-label">Display</span>
           <select

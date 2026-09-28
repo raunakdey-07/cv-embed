@@ -115,6 +115,47 @@ test('a CV with real content still exports', async ({ page, isMobile }) => {
   expect(downloads[0]).toContain('Page Count User')
 })
 
+test('the link badge counts real links, not the empty placeholder row', async ({ page }) => {
+  const seeded = resumeWith()
+  seeded.basics.links = [
+    { label: 'GitHub', url: 'https://github.com/example' },
+    { label: 'Portfolio', url: 'https://example.com' },
+  ]
+  await page.addInitScript((value) => {
+    localStorage.setItem('cvembed:draft', JSON.stringify(value))
+  }, seeded)
+
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+  await expect(page.locator('#section-basics .count-badge')).toHaveText('2')
+
+  // Removing one link leaves a real one behind.
+  await page.getByRole('button', { name: 'Remove link 1' }).click()
+  await expect(page.locator('#section-basics .count-badge')).toHaveText('1')
+
+  // Removing the last one leaves the empty row the add button needs, but the
+  // badge must not keep claiming a link exists.
+  await page.getByRole('button', { name: 'Remove link 1' }).click()
+  await expect(page.locator('#section-basics .count-badge')).toHaveText('0')
+  await expect(page.locator('input[name="link-0-url"]')).toHaveValue('')
+})
+
+test('a link that is not a URL is reported to the user', async ({ page }) => {
+  const seeded = resumeWith()
+  seeded.basics.links = [{ label: 'Site', url: 'ask me on linkedin' }]
+  await page.addInitScript((value) => {
+    localStorage.setItem('cvembed:draft', JSON.stringify(value))
+  }, seeded)
+
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+  // The issue is surfaced in the quality summary rather than silently dropped.
+  await expect(page.locator('.completion-pill').filter({ hasText: /W$/ })).toBeVisible()
+  await page.locator('.completion-pill').filter({ hasText: /W$/ }).first().click()
+  await expect(page.getByText(/must be a complete http:\/\/ or https:\/\/ URL/)).toBeVisible()
+})
+
 test('an unreadable saved draft is preserved instead of being overwritten', async ({ page }) => {
   // A draft written by a different app version: the shape parses but the schema
   // rejects it, which is the realistic way a saved CV becomes unreadable.

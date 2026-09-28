@@ -123,9 +123,15 @@ export function EmbedPage() {
   }, [lockedTemplate, resumeId, resumeLocation])
 
   const builderHandoffUrl = useMemo(() => {
-    return resume
-      ? createBuilderHandoffUrl(window.location.origin, encodeResumeForUrl(resume))
-      : '/builder'
+    if (!resume) return '/builder'
+    try {
+      return createBuilderHandoffUrl(window.location.origin, encodeResumeForUrl(resume))
+    } catch {
+      // The payload is larger than a portable link can carry. The embed itself
+      // still renders, so send the visitor to the builder rather than throwing
+      // and leaving a blank frame.
+      return '/builder'
+    }
   }, [resume])
 
   const validation = useMemo(() => (resume ? validateResume(resume) : null), [resume])
