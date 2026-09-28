@@ -167,9 +167,9 @@ test('a valid draft still loads and is not quarantined', async ({ page }) => {
   expect(quarantined).toBeNull()
 })
 
-test('builder reflows without page-level horizontal scrolling', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'mobile-only flow')
-
+test('builder reflows without page-level horizontal scrolling', async ({ page }) => {
+  // Runs on every project, not just mobile. This assertion is what caught the
+  // font-metric overflow, and font fallback is where engines differ most.
   for (const width of [280, 320, 375, 768, 1024]) {
     await page.setViewportSize({ width, height: 800 })
     await page.goto('/builder')
