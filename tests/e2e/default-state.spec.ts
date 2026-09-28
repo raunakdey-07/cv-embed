@@ -78,7 +78,12 @@ test('fresh CV shows the five core sections as empty and scores zero', async ({ 
 test('an empty CV refuses to export rather than producing a document with a placeholder name', async ({ page, isMobile }) => {
   test.skip(isMobile, 'desktop-only flow')
   const downloads: string[] = []
+  const rendererRequests: string[] = []
   page.on('download', (download) => downloads.push(download.suggestedFilename()))
+  page.on('request', (request) => {
+    const url = request.url()
+    if (url.includes('pdfRenderer') || url.includes('docxRenderer')) rendererRequests.push(url)
+  })
 
   await page.goto('/builder')
   await expect(page.getByText('Resume Readiness')).toBeVisible()
@@ -92,7 +97,12 @@ test('an empty CV refuses to export rather than producing a document with a plac
   await page.locator('.export-dropdown').getByText('DOCX', { exact: false }).first().click()
   await expect(page.getByText(/Add your name and at least one section before exporting/)).toBeVisible()
 
-  await page.waitForTimeout(500)
+  // Assert on the mechanism rather than on a stopwatch. The guard must short
+  // circuit before either renderer chunk is fetched, so a 1.5MB dynamic import
+  // is never started and no file can be produced. A fixed wait would be a
+  // false negative here, because a real export takes longer than any window a
+  // quick test should use.
+  await expect.poll(() => rendererRequests.length, { timeout: 2_000 }).toBe(0)
   expect(downloads).toEqual([])
 })
 
