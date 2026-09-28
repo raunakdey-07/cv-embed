@@ -70,7 +70,8 @@ test('fresh CV shows the five core sections as empty and scores zero', async ({ 
     await page.getByRole('button', { name: 'Preview' }).click()
   }
   await expect(page.getByText('Quality: 0/100')).toBeVisible()
-  await expect(page.locator('.page-indicator')).toHaveText('Preview pages: 1')
+  // Unmeasured: the pill is absent entirely, not a placeholder.
+  await expect(page.locator('.page-indicator')).toHaveCount(0)
   await page.waitForTimeout(1500)
   expect(pdfRequests).toEqual([])
 })
@@ -268,10 +269,19 @@ test('non-empty page count is measured after export is opened', async ({ page, i
   }, resumeWith())
 
   await page.goto('/builder')
-  await expect(page.locator('.page-indicator')).toHaveText('PDF pages: not checked')
+  // Before any measurement the pill must not exist at all, and no unmeasured
+  // placeholder text may appear anywhere in the preview header.
+  await expect(page.locator('.page-indicator')).toHaveCount(0)
+  await expect(page.locator('.preview-head')).not.toContainText(/not checked|checking|preview pages/i)
   await page.locator('.tool-btn[title="Export resume"]').click()
-  await expect.poll(async () => (await page.locator('.page-indicator').textContent()).replace('Est. PDF pages', 'PDF pages')).toBe('PDF pages: 1')
+  await expect.poll(async () => (await page.locator('.page-indicator').textContent())?.replace('Est. PDF pages', 'PDF pages')).toBe('PDF pages: 1')
   expect(pdfRequests.length).toBeGreaterThan(0)
+
+  // Editing invalidates the measurement: the old count must disappear rather
+  // than linger and describe a resume that no longer exists.
+  await page.locator('.tool-btn[title="Export resume"]').click()
+  await page.locator('input[name="name"]').fill('Page Count User Edited')
+  await expect(page.locator('.page-indicator')).toHaveCount(0)
 })
 
 test('long content reports a measured multi-page count', async ({ page, isMobile }) => {
@@ -296,4 +306,38 @@ test('long content reports a measured multi-page count', async ({ page, isMobile
     const match = text.match(/PDF pages: (\d+)/)
     return match ? Number(match[1]) : 0
   }, { timeout: 30_000 }).toBeGreaterThan(1)
+})
+
+test('an unmeasured page count is never shown as a placeholder or a fake one', async ({ page, isMobile }) => {
+  // Guards the semantic contract itself. This fails if the default page count
+  // is changed back to 1, or if an unmeasured state is given any visible
+  // substitute such as "not checked", "Preview pages: 1", or "0 pages".
+  await page.addInitScript((value) => {
+    sessionStorage.setItem('cvembed:draft', JSON.stringify(value))
+  }, resumeWith())
+
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+  if (isMobile) {
+    // The preview header only exists once the preview pane is active.
+    await page.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.locator('.preview-head')).toBeVisible()
+  }
+
+  const headerText = async () => (await page.locator('.preview-head').innerText()).toLowerCase()
+  for (const banned of ['not checked', 'preview pages', '0 pages', 'checking']) {
+    expect(await headerText()).not.toContain(banned)
+  }
+  await expect(page.locator('.page-indicator')).toHaveCount(0)
+
+  // A persisted resume with no stored measurement must also stay unmeasured
+  // after a reload rather than inheriting a value from the previous visit.
+  await page.reload()
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+  if (isMobile) {
+    await page.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.locator('.preview-head')).toBeVisible()
+  }
+  await expect(page.locator('.page-indicator')).toHaveCount(0)
+  expect(await headerText()).not.toContain('not checked')
 })

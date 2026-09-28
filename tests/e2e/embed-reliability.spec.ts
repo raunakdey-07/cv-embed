@@ -127,7 +127,6 @@ test('SDK applies template lock, shrinks height, and replaces prior instances', 
       ready,
       iframeCount: target.querySelectorAll('iframe').length,
       firstStillConnected: firstFrame.isConnected,
-      heightMessages: observedHeights.length,
       finalHeight: Number(second.getIframe()?.getAttribute('height') ?? 0),
     }
   }, { origin: new URL(page.url()).origin, resume: RESUME })
@@ -150,7 +149,13 @@ test('SDK applies template lock, shrinks height, and replaces prior instances', 
     .toBe(true)
 
   // The resize must have come from the bridge, not from a static attribute.
-  expect(result.heightMessages).toBeGreaterThan(0)
+  // Read the counter only after the poll above, never at `ready`: the counter
+  // is empty until a heightChange actually arrives, and sampling it earlier
+  // races the very message it is meant to prove.
+  const heightMessages = await page.evaluate(
+    () => (window as unknown as { __cvHeights?: number[] }).__cvHeights?.length ?? 0,
+  )
+  expect(heightMessages).toBeGreaterThan(0)
   await expect(page.frameLocator('iframe').locator('.resume-template.template-compact')).toBeVisible()
 
   await page.evaluate(() => {

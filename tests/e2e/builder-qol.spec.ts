@@ -18,7 +18,11 @@ test.describe('Builder QoL flows', () => {
     await fixNext.click()
     await expect(page.locator('.section-shell.is-active').first()).toBeVisible()
 
-    await expect(page.getByText(/Pages:/i)).toBeVisible()
+    // The header still shows its status states, but no page count: a fresh CV
+    // has never been measured, and an unmeasured count has no UI at all.
+    await expect(page.locator('.save-indicator')).toBeVisible()
+    await expect(page.locator('.score-pill')).toBeVisible()
+    await expect(page.locator('.page-indicator')).toHaveCount(0)
   })
 
   test('mobile: stacked layout and export menu are usable', async ({ page, isMobile }) => {

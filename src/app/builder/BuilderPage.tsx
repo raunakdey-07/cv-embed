@@ -20,6 +20,7 @@ import {
 } from '../../components/ui/Icons'
 import { createDownloadFileName, createPortableResumeUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl, MAX_PORTABLE_PAYLOAD_CHARS, normalizeResume, withUpdatedTimestamp } from '../../lib/utils'
 import { getOrderedSectionIds } from '../../lib/contentChecks'
+import { resolvePageCountIndicator, UNMEASURED_PAGE_COUNT } from '../../lib/pageCount'
 import { loadDraft, loadPublicBaseUrl, saveDraft, savePublicBaseUrl, type DraftLoadStatus } from '../../lib/storage'
 import { resolveNextActionSection, type BuilderSectionId } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
@@ -259,7 +260,7 @@ export function BuilderPage() {
   const [formatOpen, setFormatOpen] = useState(false)
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit')
   const scoreZoneRef = useRef<HTMLDivElement>(null)
-  const [estimatedPages, setEstimatedPages] = useState(1)
+  const [estimatedPages, setEstimatedPages] = useState(UNMEASURED_PAGE_COUNT)
   const [isPageEstimateStale, setIsPageEstimateStale] = useState(false)
   const [isPageEstimating, setIsPageEstimating] = useState(false)
   const [embedBaseUrl] = useState<string>(() => getDefaultEmbedBaseUrl())
@@ -409,8 +410,10 @@ export function BuilderPage() {
     pageCountJobRef.current = scheduledJobId
 
     if (isBlankResume(resume)) {
+      // An empty CV renders on one page visually, but no PDF has been measured
+      // for it. Record the resume as settled and report no page count.
       lastEstimatedResumeRef.current = resume
-      setEstimatedPages(1)
+      setEstimatedPages(UNMEASURED_PAGE_COUNT)
       setIsPageEstimateStale(false)
       setIsPageEstimating(false)
       return
@@ -491,6 +494,18 @@ export function BuilderPage() {
       }
     }, delay)
   }, [clearScheduledPageCount, resume])
+
+  // A measurement only describes the exact resume object it was taken from, so
+  // any edit invalidates it. Reset the count to the unmeasured state rather
+  // than filtering a stale number at render time, so the state itself is the
+  // source of truth and the default value below is load bearing. Nothing is
+  // reset when no measurement has been taken, so the default stands as-is.
+  useEffect(() => {
+    if (lastEstimatedResumeRef.current !== null && lastEstimatedResumeRef.current !== resume) {
+      setEstimatedPages(UNMEASURED_PAGE_COUNT)
+      setIsPageEstimateStale(false)
+    }
+  }, [resume])
 
   useEffect(() => {
     if (exportOpen || isEmbedPanelOpen) {
@@ -612,15 +627,10 @@ export function BuilderPage() {
       ? 'Draft not saved'
       : `Saved ${formatRelativeTime(savedAt, relativeNow)}`
 
-  const hasPageEstimate = isEmptyResume || lastEstimatedResumeRef.current === resume
-  const pageIndicatorText = isEmptyResume
-    ? 'Preview pages: 1'
-    : hasPageEstimate
-      ? `${isPageEstimating && isPageEstimateStale ? 'Est. PDF pages' : 'PDF pages'}: ${estimatedPages}`
-      : 'PDF pages: not checked'
-  const pageIndicatorTitle = isEmptyResume
-    ? 'An empty CV renders on one logical page.'
-    : 'Estimated A4 pages in the PDF export. Checking starts when you open export or embed tools.'
+  const pageIndicator = resolvePageCountIndicator(estimatedPages, {
+    isEstimating: isPageEstimating,
+    isStale: isPageEstimateStale,
+  })
 
   const onImportJson = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1187,12 +1197,14 @@ export function BuilderPage() {
           <div className="preview-head-main">
             <IconEye size={16} />
             <span className="section-title">Preview</span>
-            <span
-              className={`page-indicator${isPageEstimateStale ? ' stale' : ''}${isPageEstimating ? ' estimating' : ''}`}
-              title={pageIndicatorTitle}
-            >
-              {pageIndicatorText}
-            </span>
+            {pageIndicator ? (
+              <span
+                className={`page-indicator${isPageEstimateStale ? ' stale' : ''}${isPageEstimating ? ' estimating' : ''}`}
+                title={pageIndicator.title}
+              >
+                {pageIndicator.text}
+              </span>
+            ) : null}
             <span className={`save-indicator ${saveState}`} title="Draft status" role="status" aria-live="polite">
               {saveStatusText}
             </span>

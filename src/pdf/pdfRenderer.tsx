@@ -486,7 +486,9 @@ export async function countPdfPages(resume: Resume): Promise<number> {
   const treeMatch = text.match(/\/Type\s*\/Pages[^>]*?\/Count\s+(\d+)/)
   if (treeMatch) return parseInt(treeMatch[1], 10)
   const pages = text.match(/\/Type\s*\/Page\b(?!s)/g)
-  return pages ? pages.length : 1
+  // An unparseable document is not a one-page document. Report no measurement
+  // rather than inventing a count the caller would present as measured.
+  return pages ? pages.length : 0
 }
 
 export async function downloadResumePdf(resume: Resume, fileName: string): Promise<void> {
