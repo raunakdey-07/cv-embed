@@ -21,7 +21,7 @@ import {
   isSectionVisible,
   sectionHasContent,
 } from '../lib/contentChecks'
-import { assertPdfTextSupported } from '../lib/pdfText'
+import { assertPdfTextSupported, wrapForPdf } from '../lib/pdfText'
 import { getSafeExternalUrl } from '../lib/url'
 import { formatDateRangeByStyle, formatSingleDate } from '../lib/utils'
 import type { Resume, ResumeSectionKey } from '../types/resume'
@@ -128,7 +128,22 @@ function getPdfStyleConfig(resume: Resume) {
   })
 }
 
-function ResumePdfDocument({ resume }: { resume: Resume }) {
+function mapStrings(value: unknown, transform: (input: string) => string): unknown {
+  if (typeof value === 'string') return transform(value)
+  if (Array.isArray(value)) return value.map((entry) => mapStrings(entry, transform))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, mapStrings(entry, transform)]),
+    )
+  }
+  return value
+}
+
+function ResumePdfDocument({ resume: source }: { resume: Resume }) {
+  // Wrapping is a render-time concern only. The stored resume is never mutated,
+  // so the editor, the preview, DOCX, and JSON export keep the exact text the
+  // user typed. wrapForPdf is a no-op for every value that already fits.
+  const resume = mapStrings(source, wrapForPdf) as Resume
   const options = resume.meta.documentOptions
   const styles = getPdfStyleConfig(resume)
   const bulletPrefix = options.bulletStyle === 'dash' ? '—' : '•'
