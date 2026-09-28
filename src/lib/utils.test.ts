@@ -10,6 +10,7 @@ import {
   formatSingleDate,
   getResumeDataFromUrl,
   normalizeResume,
+  parseTechStack,
   ResumeDataError,
   withUpdatedTimestamp,
 } from './utils'
@@ -204,5 +205,29 @@ describe('date formatting', () => {
 
   it('formats short ranges with two-digit years', () => {
     expect(formatDateRangeByStyle('2024-06', '2025-08', 'short')).toBe('Jun 24 - Aug 25')
+  })
+})
+
+describe('tech stack parsing', () => {
+  it('keeps comma separated values as distinct entries', () => {
+    expect(parseTechStack('Go, Postgres, Kafka')).toEqual(['Go', 'Postgres', 'Kafka'])
+  })
+
+  it('tolerates repeated, leading, and trailing commas', () => {
+    expect(parseTechStack(',Go,,Postgres,')).toEqual(['Go', 'Postgres'])
+  })
+
+  it('trims surrounding whitespace', () => {
+    expect(parseTechStack('  React ,  Node  ')).toEqual(['React', 'Node'])
+  })
+
+  it('preserves duplicates so the user decides to remove them', () => {
+    expect(parseTechStack('Go, Go')).toEqual(['Go', 'Go'])
+  })
+
+  it('treats an empty field as no technologies', () => {
+    expect(parseTechStack('')).toEqual([])
+    expect(parseTechStack('   ')).toEqual([])
+    expect(parseTechStack(',,')).toEqual([])
   })
 })

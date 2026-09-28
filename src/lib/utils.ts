@@ -486,3 +486,8 @@ export function normalizeResume(data: unknown): Resume {
 
   return resumeSchema.parse(normalized)
 }
+
+/** Splits a free-text comma separated list such as the project tech stack. */
+export function parseTechStack(value: string): string[] {
+  return value.split(',').map((item) => item.trim()).filter(Boolean)
+}
