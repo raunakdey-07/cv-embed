@@ -634,14 +634,25 @@ needed and none was added.
 
 None. No application code changed in this milestone.
 
-One test-quality defect was found and fixed. The empty-export test asserted
-that no download occurred by waiting 500ms. A real PDF export dynamically
-imports a 1.58MB chunk and takes roughly 1.7s, so a regression that removed
-the guard would have completed after the window closed and the test would
-still have passed. It now asserts on the mechanism instead: the guard must
-short circuit before either renderer chunk is requested. Removing both guards
-was confirmed to fail this test on Chromium and on Firefox, and restoring them
-makes it pass.
+Two test-quality defects were found and fixed.
+
+The empty-export test asserted that no download occurred by waiting 500ms. A
+real PDF export dynamically imports a 1.58MB chunk and takes roughly 1.7s, so a
+regression that removed the guard would have completed after the window closed
+and the test would still have passed. It now asserts on the mechanism instead:
+the guard must short circuit before either renderer chunk is requested.
+Removing both guards was confirmed to fail this test on Chromium and on
+Firefox, and restoring them makes it pass.
+
+The SDK auto-height test waited for the embed's `ready` event and then read
+the iframe height in the same tick. `ready` and `heightChange` are independent
+postMessages with no ordering guarantee, so the frame can still carry the
+configured height when `ready` lands. That is a test assumption, not a
+product defect: the SDK applies the resize whenever the message arrives.
+Measured at one failure in five Chromium runs. The test now polls the live
+frame: eight of eight passed on Chromium, six of six on Firefox, and three
+consecutive full matrix runs were clean. The assertion keeps its meaning and
+additionally requires the resize to have arrived over the bridge.
 
 ## WebKit: blocked by the environment
 
