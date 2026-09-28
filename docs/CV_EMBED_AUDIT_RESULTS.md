@@ -10,12 +10,12 @@ Implementation date: 2026-09-24
 | --- | --- | --- |
 | `npm run lint` | Passed | Passed |
 | `npm run build` | Passed | Passed, with production entry assertion |
-| `npm run test:unit` | 3 passed | 59 passed across 7 files |
-| `npm run test:e2e` | 13 passed, 11 skipped | 29 passed, 21 skipped across 2 projects |
+| `npm run test:unit` | 3 passed | 79 passed across 8 files |
+| `npm run test:e2e` | 13 passed, 11 skipped | 81 passed, 31 skipped across 3 projects |
 | Production PDF preload | Present | Absent |
 | `npm audit --omit=dev` | 4 high | 0 high after upgrading `docx` to 9.7.2 |
 
-The 21 E2E skips are project-specific duplicates. Each test runs in the project where it applies, so the 29 passes cover both desktop and mobile behavior.
+The 31 E2E skips are project-specific duplicates. Each test runs in the project where it applies, so the 81 passes cover desktop Chromium, mobile Chromium, and Firefox.
 
 ## Issues Fixed
 
@@ -183,8 +183,8 @@ The final command sequence was run on the completed tree:
 - `npm run lint`: passed.
 - `npm run build`: passed.
 - Production entry assertion: passed.
-- `npm run test:unit`: 59 passed.
-- `npm run test:e2e`: 29 passed, 21 project-specific skips.
+- `npm run test:unit`: 79 passed.
+- `npm run test:e2e`: 81 passed, 31 project-specific skips.
 - `npm audit --omit=dev --json`: reports 0 vulnerabilities after the DOCX upgrade.
 
 # Finalization Pass
@@ -290,8 +290,8 @@ Tests in `tests/e2e/default-state.spec.ts` cover empty, one-page, and long multi
 
 ## Finalization verification
 
-- Unit tests: 59 passed across 7 files.
-- E2E tests: 29 passed, with 21 intentional project-specific skips across 2 projects.
+- Unit tests: 79 passed across 8 files.
+- E2E tests: 81 passed, with 31 intentional project-specific skips across 3 projects.
 - Production build and entry assertion: passed.
 - `npm audit --omit=dev`: 0 vulnerabilities.
 - DOCX 9.7.2 export path was exercised after the upgrade.
@@ -436,3 +436,152 @@ introducing a new presentation abstraction.
 Measured against `vite preview` on the production build at 1280x900. The page-count change did not
 introduce PDF initialization: the build-time entry assertion and both PDF lazy-load E2E tests still
 pass.
+
+# Defect Remediation Pass
+
+Date: 2026-09-28
+
+An adversarial review reproduced the remaining risks against real artifacts.
+This section records what was fixed, what was investigated and deliberately
+left alone, and what remains a product decision or an external limit.
+
+## Fixed
+
+### PDF dropped or clipped unbreakable text (P1)
+
+react-pdf breaks lines at word boundaries. A run with no break opportunity was
+measured as one line: too wide meant the element was discarded or drawn past
+the right edge and clipped. `pdftotext -bbox` on a 1000-character headline
+listed every other word on the page and no headline at all.
+
+Measured on generated PDFs, before and after:
+
+| Fixture | Before | After |
+| --- | --- | --- |
+| 700-character headline | 0 of 700 present | 700 of 700 |
+| 1000-character URL | 0 present | 1002 of 1002 |
+| 1000-character bullet | cut at 87 characters | 1001 |
+| 500-character skill token | cut at 87 characters | 501 |
+| 300-character company name | 0 present | 300 |
+| 20-sentence prose | unchanged | unchanged |
+
+`wrapForPdf` does a greedy line fill that inserts explicit breaks inside
+over-long runs, preferring common separators so a wrapped URL still reads as
+one. It is a no-op for anything that already fits. The transform runs on a
+render-time copy, so the editor, preview, DOCX, JSON, and stored data keep the
+exact text the user typed. Nothing is truncated, clipped, or hidden.
+
+### Tech Stack could not accept comma-separated input (P1)
+
+The controlled input re-derived its value from the parsed array on every
+keystroke, so React rewrote the DOM value and swallowed the comma the user had
+just typed. "Go, Postgres, Kafka" became "GoPostgresKafka", and the corrupted
+array was stored and exported.
+
+Verified with generated artifacts: the PDF and DOCX both contained
+`Tech: GoPostgresKafka`. After the fix both contain
+`Tech: Go, Postgres, Kafka`.
+
+The field now holds raw text and derives the list from it. Comma deletion,
+pasting, trailing commas, duplicates, and emptying the field are all covered.
+
+### Empty CV exported a fabricated identity (P2)
+
+The PDF text of an empty CV was exactly `Your Name`. The placeholder is gone
+from the PDF, DOCX, and both preview templates, and both exports refuse an
+empty CV with a message saying what is missing.
+
+### A dense CV could score quality 0 (P2)
+
+The quality score charged three points per warning instance with no cap, so
+length was punished without limit. Warnings are now counted per rule and
+capped at two instances.
+
+| Fixture | Completeness | Quality before | Quality after | Final before | Final after |
+| --- | --- | --- | --- | --- | --- |
+| empty | 0 | 0 | 0 | 0 | 0 |
+| basics only | 43 | 38 | 38 | 41 | 41 |
+| dense, short bullets | 100 | 64 | 85 | 82 | 93 |
+| dense, long bullets | 100 | 0 | 73 | 50 | 87 |
+
+The score shape is unchanged. Empty stays 0, cosmetic formatting still has
+zero influence, hidden sections stay out of the requirements, and growth stays
+monotonic. Two pieces of copy that promised more than the formula measures
+were corrected.
+
+### SDK configuration and update recovery (P2)
+
+`update()` committed the merged config before building the URL, and
+`buildEmbedUrl` throws on a malformed `baseUrl`. A host that passed a bad
+value and caught the error left the instance permanently dead: the message
+handler threw on every subsequent message. The config is now committed only
+after the URL builds, so a failed update is a no-op. Both new tests fail
+against the previous SDK.
+
+`onHeightChange` reported the value the SDK had just refused to apply, so a
+host could receive `NaN` into its own layout. It now reports the height the
+iframe is actually sized to.
+
+`readOnlySections` and `disableImport` are documented as metadata in the type,
+the README, and the embed debug panel. The embed renders a read-only template
+with no editing surface, so there is nothing for either option to lock.
+
+### Unreadable drafts were silently destroyed (P2)
+
+A draft that existed but could not parse returned null, the builder fell back
+to an empty CV, and 900ms later the debounced save overwrote the original. The
+raw bytes now move to `cvembed:draft:unreadable`, the autosave is held while
+the resume is still empty, and the user is told. A merely partial draft still
+normalizes and loads, which is the resilience worth keeping.
+
+## Investigated and deliberately unchanged
+
+- **Mobile section tab strip.** Not clipped. It is a working horizontal
+  scroller: the page never scrolls horizontally at 320, 375, or 414px, and
+  scrolling the strip brings the last tab fully into view. At 375px the strip
+  holds 386px of content in 275px and Skills reaches right=284 against a strip
+  edge of 284. Shortening labels or wrapping is a product decision.
+- **Non-URL link values.** Already reported. The quality pill shows the
+  warning count and opening it names the problem. Not inline is a design
+  choice, not a defect. A test now locks in that it is reported.
+- **Unknown `sectionOrder` keys.** Filtering to known keys is required by the
+  type. Preserving them would need a forward-compatible representation.
+
+## Compatibility
+
+Firefox was added as a Playwright project running the cross-cutting suite.
+The horizontal overflow regression is no longer mobile-only, because it is the
+assertion most worth cross-checking: it awaits `document.fonts.ready` and
+measures `documentElement` and `body` at 280, 320, 375, 768, and 1024px.
+
+Firefox 146 passes the whole suite with no assertion relaxed and no
+browser-specific branch, so no compatibility shim was needed.
+
+## Font loading
+
+Fonts moved from a CSS `@import` to a `<link>` with `preconnect`, because an
+`@import` is a second-order dependency: the browser must fetch and parse the
+app stylesheet before it discovers the font request.
+
+Cold-cache request start times, production build:
+
+| | Order |
+| --- | --- |
+| before | html 3ms, app assets 15ms, Google Fonts CSS 20-22ms |
+| after | html 3ms, Google Fonts CSS 15ms, in parallel with app assets |
+
+Transfer is unchanged: 122.2 kB same-origin, 99.7 kB of font payloads, 3 font
+requests, 8 requests total. Nothing was preloaded and no font was added.
+DOMContentLoaded and first contentful paint are within noise on localhost;
+the measurable win is the removed serial dependency.
+
+## Still open
+
+Product decisions: Compact PDF and DOCX export, undo for destructive actions,
+private or expiring portable links, print and locale output, and whether an
+empty CV should be blocked outright or export with empty identity fields.
+
+External limitations: full CJK PDF font support, Word or LibreOffice visual
+pagination verification for DOCX, and PDF text extraction in production. The
+CJK guard is retained deliberately: it refuses to emit a PDF it cannot render
+and names the offending characters.
