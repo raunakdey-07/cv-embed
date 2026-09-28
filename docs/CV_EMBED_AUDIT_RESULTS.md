@@ -585,3 +585,110 @@ External limitations: full CJK PDF font support, Word or LibreOffice visual
 pagination verification for DOCX, and PDF text extraction in production. The
 CJK guard is retained deliberately: it refuses to emit a PDF it cannot render
 and names the offending characters.
+
+# Cross-Browser Release Hardening
+
+Date: 2026-09-28
+
+## Browser coverage
+
+Coverage is by **browser engine**, using the builds Playwright ships. These are
+not the branded browsers, and this repository makes no claim about them.
+
+| Project | Engine | Device profile | Result |
+| --- | --- | --- | --- |
+| `desktop-chromium` | Chromium | Desktop Chrome | 47 passed |
+| `mobile-chromium` | Chromium | Pixel 7 | 34 passed, 13 skipped |
+| `firefox` | Gecko (Playwright build) | Desktop Firefox | 29 passed, 7 skipped |
+| `webkit` | WebKit (Playwright build) | Desktop Safari | not run, see below |
+
+Totals: 79 unit tests, 81 E2E passing, 31 project-scoping skips across three
+projects. Every skip is a test declaring that it applies to a different
+viewport or flow, and it self-skips. No test was excluded from Firefox to make
+it pass.
+
+## Geometry comparison, Chromium against Firefox
+
+A DOM probe walked the rendered builder at 280, 320, 375, 768, and 1024px in
+both engines, after `document.fonts.ready`, ignoring elements inside
+containers that are themselves horizontally scrollable.
+
+| Viewport | Document overflow | Body overflow | Out-of-bounds elements |
+| --- | --- | --- | --- |
+| 280 | 0 in both | 0 in both | none |
+| 320 | 0 in both | 0 in both | none |
+| 375 | 0 in both | 0 in both | none |
+| 768 | 0 in both | 0 in both | none |
+| 1024 | 0 in both | 0 in both | none |
+
+Touch targets matched between engines at every width. No control fell below
+24px in height at any mobile width. The two controls measured 38x23 at 1024px
+in both engines, which is a desktop pointer context; below 900px they are
+40x40.
+
+The historical 280-320px overflow came from web font metrics widening the
+header action group. That fix holds in Gecko, so no browser-specific CSS was
+needed and none was added.
+
+## Genuine compatibility bugs found
+
+None. No application code changed in this milestone.
+
+One test-quality defect was found and fixed. The empty-export test asserted
+that no download occurred by waiting 500ms. A real PDF export dynamically
+imports a 1.58MB chunk and takes roughly 1.7s, so a regression that removed
+the guard would have completed after the window closed and the test would
+still have passed. It now asserts on the mechanism instead: the guard must
+short circuit before either renderer chunk is requested. Removing both guards
+was confirmed to fail this test on Chromium and on Firefox, and restoring them
+makes it pass.
+
+## WebKit: blocked by the environment
+
+WebKit could not be run here, so it was not added to the project matrix.
+
+`npx playwright install webkit` downloads the browser successfully, but the
+host cannot execute it. `ldd` on the WebKit binaries reports these unresolved:
+
+```
+libicudata.so.74, libicui18n.so.74, libicuuc.so.74, libjpeg.so.8, libjxl.so.0.8
+```
+
+The host has ICU 77 and libjpeg 62, and the machine has no package manager and
+no root, so the required libraries cannot be installed. Symlinking ICU 77 onto
+the `.so.74` sonames was tried and rejected: it produces ELF class errors, and
+an ABI-mismatched ICU would make any WebKit result untrustworthy rather than
+merely incomplete.
+
+Adding an unverifiable project to CI would risk turning the pipeline red on a
+commit that could not be tested, so the matrix is left at the browsers that
+are actually exercised.
+
+To enable it on a runner that can install system packages:
+
+1. Add a project to `playwright.config.ts` using `devices['Desktop Safari']`
+   with the same `testMatch` list the `firefox` project uses.
+2. Change the install step in `.github/workflows/ci.yml` to
+   `npx playwright install --with-deps chromium firefox webkit`.
+
+`ubuntu-latest` runners have apt and Playwright installs these libraries
+automatically with `--with-deps`. No application change is expected; the same
+suite is engine-neutral by construction.
+
+## Final gate
+
+| Check | Result |
+| --- | --- |
+| `npm run lint` | passed |
+| `npm run build` | passed |
+| Production eager-PDF assertion | passed |
+| `npm run check:sdk` | passed |
+| `npm run test:unit` | 79 passed, 8 files |
+| `npm run test:e2e` | 81 passed, 31 skipped, 3 projects |
+| `npx playwright test --project=firefox` | 29 passed, 7 skipped |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `git diff --check` | clean |
+| First-visit transfer | 122.3 kB same-origin, 222.0 kB with fonts, 8 requests |
+| PDF chunk requests on first visit | 0 |
+
+No dependency, lockfile, generated, or application file changed.
