@@ -26,3 +26,6 @@ dist-ssr
 # Playwright artifacts
 test-results/
 playwright-report/
+
+# Local AI-agent instructions are machine and workflow specific, not part of this repository.
+**/AGENTS.md
