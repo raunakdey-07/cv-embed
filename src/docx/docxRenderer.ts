@@ -338,7 +338,7 @@ function createResumeDocxDocument(resume: Resume): Document {
       spacing: { after: 80 },
       children: [
         new TextRun({
-          text: resume.basics.name || 'Your Name',
+          text: resume.basics.name,
           bold: true,
           size: 34,
           color: toDocxAccent(options.accentColor),

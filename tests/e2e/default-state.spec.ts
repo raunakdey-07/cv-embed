@@ -75,6 +75,46 @@ test('fresh CV shows the five core sections as empty and scores zero', async ({ 
   expect(pdfRequests).toEqual([])
 })
 
+test('an empty CV refuses to export rather than producing a document with a placeholder name', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  const downloads: string[] = []
+  page.on('download', (download) => downloads.push(download.suggestedFilename()))
+
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+  await page.locator('.tool-btn[title="Export resume"]').click()
+  await page.locator('.export-dropdown').waitFor({ state: 'visible' })
+
+  await page.locator('.export-dropdown').getByText('PDF', { exact: false }).first().click()
+  await expect(page.getByText(/Add your name and at least one section before exporting/)).toBeVisible()
+
+  await page.locator('.tool-btn[title="Export resume"]').click()
+  await page.locator('.export-dropdown').getByText('DOCX', { exact: false }).first().click()
+  await expect(page.getByText(/Add your name and at least one section before exporting/)).toBeVisible()
+
+  await page.waitForTimeout(500)
+  expect(downloads).toEqual([])
+})
+
+test('a CV with real content still exports', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  const downloads: string[] = []
+  page.on('download', (download) => downloads.push(download.suggestedFilename()))
+
+  await page.addInitScript((value) => {
+    sessionStorage.setItem('cvembed:draft', JSON.stringify(value))
+  }, resumeWith())
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+  await page.locator('.tool-btn[title="Export resume"]').click()
+  await page.locator('.export-dropdown').waitFor({ state: 'visible' })
+  await page.locator('.export-dropdown').getByText('PDF', { exact: false }).first().click()
+
+  await expect.poll(() => downloads.length, { timeout: 30_000 }).toBeGreaterThan(0)
+  expect(downloads[0]).toContain('Page Count User')
+})
+
 test('builder reflows without page-level horizontal scrolling', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'mobile-only flow')
 

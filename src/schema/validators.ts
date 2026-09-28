@@ -9,6 +9,34 @@ const MAX_ACCOMPLISHMENT_BULLETS = 3
 const MAX_VOLUNTEERING_BULLETS = 4
 const MAX_BULLET_CHARS = 180
 
+const ERROR_PENALTY = 15
+const WARNING_PENALTY = 3
+
+// A single rule can fire many times on one CV: a dense CV trips the per-entry
+// bullet caps dozens of times. Charging per instance turned length into
+// punishment, so a longer, more credible CV scored worse than a shorter one and
+// the quality score bottomed out at zero. Penalties are counted per rule and
+// capped, so each distinct problem costs a bounded amount and adding a fifth
+// role no longer keeps subtracting.
+const MAX_INSTANCES_PER_RULE = 2
+
+function warningRuleKey(warning: string): string {
+  return warning.replace(/\[\d+\]/g, '[]').replace(/\d+/g, 'N')
+}
+
+function warningPenalty(warnings: string[]): number {
+  const perRule = new Map<string, number>()
+  for (const warning of warnings) {
+    const rule = warningRuleKey(warning)
+    perRule.set(rule, (perRule.get(rule) ?? 0) + 1)
+  }
+  let penalty = 0
+  for (const count of perRule.values()) {
+    penalty += Math.min(count, MAX_INSTANCES_PER_RULE) * WARNING_PENALTY
+  }
+  return penalty
+}
+
 function isBlank(value: string): boolean {
   return value.trim().length === 0
 }
@@ -266,7 +294,7 @@ export function validateResume(resume: Resume): ValidationResult {
   // completeness score is also the content coverage gate, so default sections
   // and formatting alone cannot produce a non-zero quality score.
   const completenessScore = calculateCompletenessScore(resume)
-  const penaltyAdjustedQuality = clampScore(100 - errors.length * 15 - warnings.length * 3)
+  const penaltyAdjustedQuality = clampScore(100 - errors.length * ERROR_PENALTY - warningPenalty(warnings))
   const qualityScore = completenessScore === 0
     ? 0
     : clampScore(Math.round(penaltyAdjustedQuality * completenessScore / 100))

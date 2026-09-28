@@ -332,7 +332,7 @@ function ResumePdfDocument({ resume: source }: { resume: Resume }) {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.name}>{resume.basics.name || 'Your Name'}</Text>
+          {resume.basics.name ? <Text style={styles.name}>{resume.basics.name}</Text> : null}
           {resume.basics.headline ? <Text style={styles.headline}>{resume.basics.headline}</Text> : null}
           <Text style={styles.contact}>{[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}</Text>
           <View style={styles.linksRow}>

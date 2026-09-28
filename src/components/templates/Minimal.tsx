@@ -221,7 +221,7 @@ export function MinimalTemplate({ resume, primaryColor, densityMode = 'comfortab
   return (
     <article className={sectionClassName} style={{ '--primary': primaryColor ?? options.accentColor } as CSSProperties}>
       <header className="resume-header">
-        <h1>{resume.basics.name || 'Your Name'}</h1>
+        <h1>{resume.basics.name}</h1>
         {resume.basics.headline ? <p>{resume.basics.headline}</p> : null}
         <p>
           {[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}

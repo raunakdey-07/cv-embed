@@ -666,6 +666,10 @@ export function BuilderPage() {
   }
 
   const onDownloadPdf = useCallback(async () => {
+    if (isBlankResume(resume)) {
+      showNotice('Add your name and at least one section before exporting. The document is empty right now.', 'error')
+      return
+    }
     try {
       setBusy(true)
       const { downloadResumePdf } = await import('../../pdf/pdfRenderer')
@@ -686,6 +690,10 @@ export function BuilderPage() {
   }, [resume, showNotice])
 
   const onDownloadDocx = useCallback(async () => {
+    if (isBlankResume(resume)) {
+      showNotice('Add your name and at least one section before exporting. The document is empty right now.', 'error')
+      return
+    }
     try {
       setBusy(true)
       const { downloadResumeDocx } = await import('../../docx/docxRenderer')
@@ -982,7 +990,7 @@ export function BuilderPage() {
                     <IconCheck size={10} /> Clean
                   </button>
                   <div id="clean-details" className="completion-pill-popover" role="tooltip" aria-hidden={openPopover !== 'clean'}>
-                    No validation issues right now. Next action: add measurable outcomes to improve overall quality.
+                    No validation issues right now. Review the exported PDF before sending it.
                   </div>
                 </div>
               )}
@@ -1197,7 +1205,7 @@ export function BuilderPage() {
                 <div id="scoring-rubric" className="score-help-popover" role="group" aria-label="Scoring rubric" aria-hidden={openPopover !== 'score'}>
                   <p className="score-help-title">Scoring Rubric</p>
                   <ul>
-                    <li><strong>Quality:</strong> errors, warnings, and writing signals</li>
+                    <li><strong>Quality:</strong> starts at 100 and deducts for errors and warnings</li>
                     <li><strong>Completeness:</strong> shown in the readiness strip above</li>
                     <li><strong>Tip:</strong> use readiness to track section progress</li>
                   </ul>

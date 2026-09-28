@@ -228,7 +228,7 @@ export function CompactTemplate({ resume, primaryColor, densityMode = 'compact' 
     <article className={sectionClassName} style={{ '--primary': primaryColor ?? options.accentColor } as CSSProperties}>
       <header className="resume-header resume-compact-header">
         <div className="resume-compact-header-main">
-          <h1>{resume.basics.name || 'Your Name'}</h1>
+          <h1>{resume.basics.name}</h1>
           {resume.basics.headline ? <p>{resume.basics.headline}</p> : null}
           <p>
             {[resume.basics.email, resume.basics.phone, resume.basics.location].filter(Boolean).join(' • ')}
