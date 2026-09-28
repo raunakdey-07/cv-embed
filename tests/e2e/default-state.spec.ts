@@ -115,6 +115,58 @@ test('a CV with real content still exports', async ({ page, isMobile }) => {
   expect(downloads[0]).toContain('Page Count User')
 })
 
+test('an unreadable saved draft is preserved instead of being overwritten', async ({ page }) => {
+  // A draft written by a different app version: the shape parses but the schema
+  // rejects it, which is the realistic way a saved CV becomes unreadable.
+  const future = resumeWith()
+  future.meta.version = '99.0'
+  const corrupt = JSON.stringify(future)
+
+  await page.addInitScript((value) => {
+    localStorage.setItem('cvembed:draft', value)
+  }, corrupt)
+
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+  // The user is told rather than silently shown an empty CV.
+  await expect(page.getByText(/saved CV could not be read/i)).toBeVisible()
+
+  // Give the debounced autosave more than enough time to run if it were going to.
+  await page.waitForTimeout(1500)
+  const preserved = await page.evaluate(() => ({
+    quarantined: localStorage.getItem('cvembed:draft:unreadable'),
+    draftKey: localStorage.getItem('cvembed:draft'),
+  }))
+  expect(preserved.quarantined).toBe(corrupt)
+  expect(preserved.draftKey).toBeNull()
+})
+
+test('a partially written draft that normalizes cleanly still loads', async ({ page }) => {
+  const partial = { basics: { name: 'Recovered User', email: 'r@example.com' } }
+  await page.addInitScript((value) => {
+    localStorage.setItem('cvembed:draft', value)
+  }, JSON.stringify(partial))
+
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+  await expect(page.locator('input[name="name"]')).toHaveValue('Recovered User')
+  const quarantined = await page.evaluate(() => localStorage.getItem('cvembed:draft:unreadable'))
+  expect(quarantined).toBeNull()
+})
+
+test('a valid draft still loads and is not quarantined', async ({ page }) => {
+  await page.addInitScript((value) => {
+    localStorage.setItem('cvembed:draft', JSON.stringify(value))
+  }, resumeWith())
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+  await expect(page.locator('input[name="name"]')).toHaveValue('Page Count User')
+  const quarantined = await page.evaluate(() => localStorage.getItem('cvembed:draft:unreadable'))
+  expect(quarantined).toBeNull()
+})
+
 test('builder reflows without page-level horizontal scrolling', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'mobile-only flow')
 

@@ -60,7 +60,8 @@ describe('draft storage', () => {
 
     expect(saveDraft(resume)).toBe(true)
     expect(window.localStorage.getItem('cvembed:draft')).toContain('Saved User')
-    expect(loadDraft()?.basics.name).toBe('Saved User')
+    expect(loadDraft().resume?.basics.name).toBe('Saved User')
+    expect(loadDraft().status).toBe('ok')
   })
 
   it('prefers the current local draft over an older session draft', () => {
@@ -71,7 +72,7 @@ describe('draft storage', () => {
     window.localStorage.setItem('cvembed:draft', JSON.stringify(local))
     window.sessionStorage.setItem('cvembed:draft', JSON.stringify(session))
 
-    expect(loadDraft()?.basics.name).toBe('Local User')
+    expect(loadDraft().resume?.basics.name).toBe('Local User')
   })
 
   it('falls back to session storage when local storage is blocked', () => {
@@ -80,7 +81,7 @@ describe('draft storage', () => {
     resume.basics.name = 'Session User'
 
     expect(saveDraft(resume)).toBe(true)
-    expect(loadDraft()?.basics.name).toBe('Session User')
+    expect(loadDraft().resume?.basics.name).toBe('Session User')
   })
 
   it('drops unknown persisted fields while preserving known data', () => {
@@ -89,8 +90,10 @@ describe('draft storage', () => {
       unknownField: 'ignored',
     }))
 
-    expect(loadDraft()?.basics.name).toBe('')
-    expect(loadDraft()).not.toHaveProperty('unknownField')
+    const result = loadDraft()
+    expect(result.resume?.basics.name).toBe('')
+    expect(result.resume).not.toHaveProperty('unknownField')
+    expect(result.status).toBe('ok')
   })
 
   it('reports failure when both storage scopes are blocked', () => {
@@ -100,8 +103,42 @@ describe('draft storage', () => {
     expect(saveDraft(createEmptyResume())).toBe(false)
   })
 
-  it('ignores malformed stored data', () => {
+  it('reports a missing draft rather than treating it as corrupt', () => {
+    expect(loadDraft()).toEqual({ resume: null, status: 'missing', preserved: false })
+  })
+
+  it('quarantines an unreadable draft instead of leaving it to be overwritten', () => {
     window.localStorage.setItem('cvembed:draft', '{"education":{}}')
-    expect(loadDraft()).toBeNull()
+
+    const result = loadDraft()
+    expect(result.resume).toBeNull()
+    expect(result.status).toBe('unreadable')
+    expect(result.preserved).toBe(true)
+    // The original bytes survive under the quarantine key.
+    expect(window.localStorage.getItem('cvembed:draft:unreadable')).toBe('{"education":{}}')
+  })
+
+  it('preserves the first unreadable draft and does not overwrite it with later ones', () => {
+    window.localStorage.setItem('cvembed:draft', 'first broken payload')
+    loadDraft()
+    window.localStorage.setItem('cvembed:draft', 'second broken payload')
+    loadDraft()
+
+    expect(window.localStorage.getItem('cvembed:draft:unreadable')).toBe('first broken payload')
+  })
+
+  it('treats a draft written by a different schema version as unreadable', () => {
+    const future = { ...createEmptyResume(), meta: { ...createEmptyResume().meta, version: '99.0' } }
+    window.localStorage.setItem('cvembed:draft', JSON.stringify(future))
+
+    expect(loadDraft().status).toBe('unreadable')
+    expect(window.localStorage.getItem('cvembed:draft:unreadable')).toContain('99.0')
+  })
+
+  it('still reads a valid legacy draft that normalizes cleanly', () => {
+    const legacy = { ...createEmptyResume(), legacyOnlyField: 'x' }
+    window.localStorage.setItem('cvembed:draft', JSON.stringify(legacy))
+
+    expect(loadDraft().status).toBe('ok')
   })
 })

@@ -20,7 +20,7 @@ import {
 } from '../../components/ui/Icons'
 import { createDownloadFileName, createPortableResumeUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl, MAX_PORTABLE_PAYLOAD_CHARS, normalizeResume, withUpdatedTimestamp } from '../../lib/utils'
 import { getOrderedSectionIds } from '../../lib/contentChecks'
-import { loadDraft, loadPublicBaseUrl, saveDraft, savePublicBaseUrl } from '../../lib/storage'
+import { loadDraft, loadPublicBaseUrl, saveDraft, savePublicBaseUrl, type DraftLoadStatus } from '../../lib/storage'
 import { resolveNextActionSection, type BuilderSectionId } from '../../lib/nextAction'
 import { validateResume } from '../../schema/validators'
 import { createEmptyResume, type DocumentOptions, type Resume, type ResumeSectionKey } from '../../types/resume'
@@ -219,13 +219,18 @@ function getScrollBehavior(): ScrollBehavior {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 }
 
-function loadInitialResume(): Resume {
+function loadInitialState(): { resume: Resume; draftStatus: DraftLoadStatus; draftPreserved: boolean } {
   const handoffData = getResumeDataFromUrl(new URL(window.location.href))
   if (handoffData) {
     const decoded = decodeResumeFromUrl(handoffData)
-    if (decoded) return decoded
+    if (decoded) return { resume: decoded, draftStatus: 'missing', draftPreserved: false }
   }
-  return loadDraft() ?? createEmptyResume()
+  const draft = loadDraft()
+  return {
+    resume: draft.resume ?? createEmptyResume(),
+    draftStatus: draft.status,
+    draftPreserved: draft.preserved,
+  }
 }
 
 export function BuilderPage() {
@@ -238,7 +243,12 @@ export function BuilderPage() {
   const pageCountIdleHandleRef = useRef<number | null>(null)
   const lastEstimatedResumeRef = useRef<Resume | null>(null)
 
-  const [resume, setResume] = useState<Resume>(loadInitialResume)
+  const [initialState] = useState(loadInitialState)
+  const [resume, setResume] = useState<Resume>(initialState.resume)
+  // After an unreadable draft is recovered the builder starts empty. Hold the
+  // autosave until the user types, so the empty CV is never written back over
+  // storage on its own.
+  const holdAutosaveRef = useRef(initialState.draftStatus === 'unreadable')
   const [embedArtifacts, setEmbedArtifacts] = useState<EmbedArtifacts | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
@@ -287,10 +297,25 @@ export function BuilderPage() {
   }, [])
 
   useEffect(() => {
+    if (initialState.draftStatus !== 'unreadable') return
+    showNotice(
+      initialState.draftPreserved
+        ? 'Your saved CV could not be read and was not overwritten. A copy of the unreadable data was kept in this browser.'
+        : 'Your saved CV could not be read. It was not overwritten.',
+      'error',
+    )
+  }, [initialState.draftStatus, initialState.draftPreserved, showNotice])
+
+  useEffect(() => {
     latestResumeRef.current = resume
   }, [resume])
 
   useEffect(() => {
+    if (holdAutosaveRef.current && isEmptyResume) {
+      setSaveState('error')
+      return
+    }
+    holdAutosaveRef.current = false
     setSaveState('saving')
     const timer = window.setTimeout(() => {
       const saved = saveDraft(withUpdatedTimestamp(resume))
@@ -299,7 +324,7 @@ export function BuilderPage() {
     }, DRAFT_SAVE_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
-  }, [resume])
+  }, [resume, isEmptyResume])
 
   useEffect(() => {
     const flushDraft = () => {
