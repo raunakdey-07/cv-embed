@@ -6,6 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0c0d11" />
     <title>CV-Embed</title>
+    <!--
+      Fonts are declared here rather than with a CSS @import. An @import inside
+      the bundled stylesheet is serial: the browser must download and parse the
+      app CSS before it discovers the font request, which costs an extra
+      round trip on the critical path. A link tag starts the fetch in parallel
+      and preconnect removes DNS and TLS from it.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600&family=Bricolage+Grotesque:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Syne:wght@500;600;700;800&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

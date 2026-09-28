@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600&family=Bricolage+Grotesque:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Syne:wght@500;600;700;800&display=swap');
+/* Fonts are linked from index.html so the request starts in parallel with this
+   stylesheet instead of after it is parsed. */
 
 /* ═══════════════════════ Tokens ═══════════════════════ */
 
