@@ -127,6 +127,7 @@ test('SDK applies template lock, shrinks height, and replaces prior instances', 
       ready,
       iframeCount: target.querySelectorAll('iframe').length,
       firstStillConnected: firstFrame.isConnected,
+      heightMessages: observedHeights.length,
       finalHeight: Number(second.getIframe()?.getAttribute('height') ?? 0),
     }
   }, { origin: new URL(page.url()).origin, resume: RESUME })
@@ -134,8 +135,22 @@ test('SDK applies template lock, shrinks height, and replaces prior instances', 
   expect(result.ready).toBe(true)
   expect(result.iframeCount).toBe(1)
   expect(result.firstStillConnected).toBe(false)
-  expect(result.finalHeight).toBeGreaterThan(0)
-  expect(result.finalHeight).toBeLessThan(1100)
+
+  // autoHeight must shrink the frame to its content. `ready` and `heightChange`
+  // are independent postMessages with no ordering guarantee, so waiting for
+  // `ready` and sampling the height in the same tick is a race: the frame can
+  // still carry the configured height when `ready` lands. Poll the live frame
+  // instead of reading it once.
+  const frame = page.locator('#sdk-target iframe')
+  await expect
+    .poll(async () => {
+      const height = Number(await frame.getAttribute('height'))
+      return height > 0 && height < 1100
+    }, { timeout: 15_000 })
+    .toBe(true)
+
+  // The resize must have come from the bridge, not from a static attribute.
+  expect(result.heightMessages).toBeGreaterThan(0)
   await expect(page.frameLocator('iframe').locator('.resume-template.template-compact')).toBeVisible()
 
   await page.evaluate(() => {
