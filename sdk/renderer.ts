@@ -10,8 +10,20 @@ export interface CVEmbedOptions {
   autoHeight?: boolean
   debug?: boolean
   mode?: 'preview' | 'guided' | 'edit'
+  /**
+   * Metadata only. The embedded resume is always read-only: it renders a
+   * template with no editing surface, so there is nothing for this to lock.
+   * It is forwarded to the frame and reported in the `ready` payload so a host
+   * can read back what it requested. It is NOT a security control and must not
+   * be relied on to hide data from the viewer.
+   */
   readOnlySections?: string[]
   lockedTemplate?: 'minimal' | 'compact'
+  /**
+   * Metadata only, for the same reason as readOnlySections. The embed exposes
+   * no import control, and the resume lives in the URL fragment the host
+   * itself supplied. It is NOT a security control.
+   */
   disableImport?: boolean
   disableDownload?: boolean
   eventTargetOrigin?: string
@@ -181,7 +193,11 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   const embedId = randomEmbedId()
 
   const iframe = document.createElement('iframe')
-  iframe.src = buildEmbedUrl(activeConfig, embedId)
+  const initialUrl = buildEmbedUrl(activeConfig, embedId)
+  // Derived from a configuration that already built successfully, so the
+  // message handler can never throw on a value the host supplied.
+  let expectedOrigin = new URL(initialUrl).origin
+  iframe.src = initialUrl
   iframe.width = String(config.width ?? '100%')
   iframe.height = String(config.height ?? 1100)
   iframe.frameBorder = '0'
@@ -191,7 +207,6 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   iframe.referrerPolicy = 'strict-origin-when-cross-origin'
 
   const onMessage = (event: MessageEvent) => {
-    const expectedOrigin = new URL(activeConfig.baseUrl ?? getDefaultBaseUrl(), window.location.href).origin
     if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) {
       return
     }
@@ -215,7 +230,9 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
         listeners.onHeightChange?.({ height: appliedHeight })
         return
       }
-      listeners.onHeightChange?.({ height: nextHeight })
+      // Report what the iframe is actually sized to, never a rejected value
+      // that a host would write straight into its own layout.
+      listeners.onHeightChange?.({ height: Math.max(0, Math.min(10000, Math.round(Number(iframe.height) || 0))) })
     }
   }
 
@@ -235,15 +252,23 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   }
 
   const update = (nextConfig: Partial<CVEmbedConfig>) => {
-    activeConfig = {
+    const merged: CVEmbedConfig = {
       ...activeConfig,
       ...nextConfig,
       theme: { ...(activeConfig.theme ?? {}), ...(nextConfig.theme ?? {}) },
       options: { ...(activeConfig.options ?? {}), ...(nextConfig.options ?? {}) },
       events: mergeEvents(activeConfig.events, nextConfig.events),
     }
+
+    // Build before committing. buildEmbedUrl throws on a malformed baseUrl; if
+    // the merged config were assigned first, the bad value would poison every
+    // later message and the bridge would stay dead with no way to recover.
+    const nextUrl = buildEmbedUrl(merged, embedId)
+
+    activeConfig = merged
+    expectedOrigin = new URL(nextUrl).origin
     listeners = mergeEvents(listeners, nextConfig.events)
-    const nextUrl = buildEmbedUrl(activeConfig, embedId)
+
     if (iframe.src !== nextUrl) {
       iframe.src = nextUrl
     }

@@ -104,9 +104,9 @@ npm run bench:server # Run local Chromium benchmark server
 - `options.autoHeight` (default `true`): auto-resize iframe based on embed content.
 - `options.mode`: `preview | guided | edit`.
 - `options.debug`: render integration diagnostics inside embed.
-- `options.readOnlySections`: pass host policy metadata.
+- `options.readOnlySections`: **metadata only, not enforced.** The embedded resume is always read-only because it renders a template with no editing surface. The value is forwarded to the frame and reported in the `ready` payload so a host can read back what it requested. Do not use it as a security control.
 - `options.lockedTemplate`: lock render template to `minimal` or `compact`.
-- `options.disableImport`: pass host policy metadata.
+- `options.disableImport`: **metadata only, not enforced.** The embed exposes no import control. Do not use it as a security control.
 - `options.disableDownload`: force hide builder CTA.
 - `options.eventTargetOrigin`: explicit `postMessage` target origin. The SDK defaults to the host page origin.
 - `theme.fontScale`: scale resume typography (0.9 - 1.25).

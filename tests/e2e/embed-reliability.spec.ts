@@ -147,3 +147,121 @@ test('SDK applies template lock, shrinks height, and replaces prior instances', 
   await page.waitForTimeout(200)
   expect(pageErrors).toEqual([])
 })
+
+test('a malformed update is rejected without breaking the bridge', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.goto('/builder')
+  await page.evaluate(() => {
+    document.getElementById('root')!.innerHTML = '<div id="sdk-target"></div>'
+  })
+  await page.addScriptTag({ url: new URL('/sdk.js?v=2', page.url()).toString() })
+
+  const result = await page.evaluate(async ({ origin, resume }) => {
+    const target = document.getElementById('sdk-target')!
+    const sdk = (window as unknown as SdkWindow).CVEmbed
+    const heights: number[] = []
+    let readyCount = 0
+
+    const instance = sdk.render({
+      target,
+      baseUrl: origin,
+      resumeData: resume,
+      height: 900,
+      events: {
+        onReady: () => { readyCount += 1 },
+        onHeightChange: ({ height }) => { heights.push(height) },
+      },
+    })
+
+    // A malformed baseUrl must throw, and must not corrupt the live config.
+    let threw = false
+    try {
+      instance.update({ baseUrl: 'http://' })
+    } catch {
+      threw = true
+    }
+
+    // A valid update after the failure must still work.
+    instance.update({ height: 640 })
+
+    const waitFor = (predicate: () => boolean) => new Promise<void>((resolve) => {
+      const started = Date.now()
+      const check = () => {
+        if (predicate() || Date.now() - started > 10000) {
+          resolve()
+          return
+        }
+        window.setTimeout(check, 50)
+      }
+      check()
+    })
+
+    await waitFor(() => readyCount > 0)
+    await waitFor(() => heights.length > 0)
+
+    return {
+      threw,
+      readyCount,
+      heightMessages: heights.length,
+      srcAfterFailure: instance.getIframe()?.getAttribute('src') ?? '',
+    }
+  }, { origin: new URL(page.url()).origin, resume: RESUME })
+
+  expect(result.threw).toBe(true)
+  // The bridge survived: the embed still signalled ready and resized.
+  expect(result.readyCount).toBeGreaterThan(0)
+  expect(result.heightMessages).toBeGreaterThan(0)
+  expect(result.srcAfterFailure).toContain('/embed/')
+  expect(result.srcAfterFailure).not.toContain('http://embed')
+  expect(pageErrors).toEqual([])
+})
+
+test('onHeightChange never reports a value the iframe was not sized to', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  await page.goto('/builder')
+  await page.evaluate(() => {
+    document.getElementById('root')!.innerHTML = '<div id="sdk-target"></div>'
+  })
+  await page.addScriptTag({ url: new URL('/sdk.js?v=2', page.url()).toString() })
+
+  const rejected = await page.evaluate(async ({ origin, resume }) => {
+    const target = document.getElementById('sdk-target')!
+    const sdk = (window as unknown as SdkWindow).CVEmbed
+    const reported: number[] = []
+    const instance = sdk.render({
+      target,
+      baseUrl: origin,
+      resumeData: resume,
+      height: 640,
+      options: { autoHeight: false },
+      events: { onHeightChange: ({ height }) => { reported.push(height) } },
+    })
+
+    const frame = instance.getIframe()!
+    const embedId = new URL(frame.src).searchParams.get('embedId')
+    const post = (height: unknown) => {
+      frame.contentWindow?.postMessage(
+        { source: 'cv-embed', version: '2', event: 'heightChange', embedId, payload: { height } },
+        origin,
+      )
+    }
+
+    post('not-a-number')
+    await new Promise((resolve) => window.setTimeout(resolve, 150))
+    post(-500)
+    await new Promise((resolve) => window.setTimeout(resolve, 150))
+    post(999999999)
+    await new Promise((resolve) => window.setTimeout(resolve, 150))
+
+    return { reported, applied: Number(frame.getAttribute('height')) }
+  }, { origin: new URL(page.url()).origin, resume: RESUME })
+
+  // autoHeight is off, so nothing is applied; every report must be a real number
+  // that matches the iframe rather than NaN, a negative, or an uncapped value.
+  for (const height of rejected.reported) {
+    expect(Number.isFinite(height)).toBe(true)
+    expect(height).toBe(rejected.applied)
+  }
+})

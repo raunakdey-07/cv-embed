@@ -98,7 +98,9 @@ var CVEmbed = (function(exports) {
     let listeners = mergeEvents(config.events);
     const embedId = randomEmbedId();
     const iframe = document.createElement("iframe");
-    iframe.src = buildEmbedUrl(activeConfig, embedId);
+    const initialUrl = buildEmbedUrl(activeConfig, embedId);
+    let expectedOrigin = new URL(initialUrl).origin;
+    iframe.src = initialUrl;
     iframe.width = String((_b = config.width) != null ? _b : "100%");
     iframe.height = String((_c = config.height) != null ? _c : 1100);
     iframe.frameBorder = "0";
@@ -107,8 +109,7 @@ var CVEmbed = (function(exports) {
     iframe.setAttribute("title", (_d = config.title) != null ? _d : "Embedded CV-Embed Resume");
     iframe.referrerPolicy = "strict-origin-when-cross-origin";
     const onMessage = (event) => {
-      var _a2, _b2, _c2, _d2, _e, _f, _g, _h, _i;
-      const expectedOrigin = new URL((_a2 = activeConfig.baseUrl) != null ? _a2 : getDefaultBaseUrl(), window.location.href).origin;
+      var _a2, _b2, _c2, _d2, _e, _f, _g, _h;
       if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) {
         return;
       }
@@ -116,20 +117,20 @@ var CVEmbed = (function(exports) {
       if (!data || data.source !== "cv-embed" || data.version !== "2" || data.embedId !== embedId || !data.payload || typeof data.payload !== "object") {
         return;
       }
-      (_b2 = listeners.onMessage) == null ? void 0 : _b2.call(listeners, data);
-      if (data.event === "ready") (_c2 = listeners.onReady) == null ? void 0 : _c2.call(listeners, data.payload);
-      if (data.event === "validationChange") (_d2 = listeners.onValidationChange) == null ? void 0 : _d2.call(listeners, data.payload);
-      if (data.event === "sectionFocus") (_e = listeners.onSectionFocus) == null ? void 0 : _e.call(listeners, data.payload);
-      if (data.event === "export") (_f = listeners.onExport) == null ? void 0 : _f.call(listeners, data.payload);
+      (_a2 = listeners.onMessage) == null ? void 0 : _a2.call(listeners, data);
+      if (data.event === "ready") (_b2 = listeners.onReady) == null ? void 0 : _b2.call(listeners, data.payload);
+      if (data.event === "validationChange") (_c2 = listeners.onValidationChange) == null ? void 0 : _c2.call(listeners, data.payload);
+      if (data.event === "sectionFocus") (_d2 = listeners.onSectionFocus) == null ? void 0 : _d2.call(listeners, data.payload);
+      if (data.event === "export") (_e = listeners.onExport) == null ? void 0 : _e.call(listeners, data.payload);
       if (data.event === "heightChange") {
         const nextHeight = Number(data.payload.height);
-        if (((_g = activeConfig.options) == null ? void 0 : _g.autoHeight) !== false && Number.isFinite(nextHeight) && nextHeight > 0) {
+        if (((_f = activeConfig.options) == null ? void 0 : _f.autoHeight) !== false && Number.isFinite(nextHeight) && nextHeight > 0) {
           const appliedHeight = Math.min(1e4, Math.round(nextHeight));
           iframe.height = String(appliedHeight);
-          (_h = listeners.onHeightChange) == null ? void 0 : _h.call(listeners, { height: appliedHeight });
+          (_g = listeners.onHeightChange) == null ? void 0 : _g.call(listeners, { height: appliedHeight });
           return;
         }
-        (_i = listeners.onHeightChange) == null ? void 0 : _i.call(listeners, { height: nextHeight });
+        (_h = listeners.onHeightChange) == null ? void 0 : _h.call(listeners, { height: Math.max(0, Math.min(1e4, Math.round(Number(iframe.height) || 0))) });
       }
     };
     window.addEventListener("message", onMessage);
@@ -146,15 +147,17 @@ var CVEmbed = (function(exports) {
     };
     const update = (nextConfig) => {
       var _a2, _b2, _c2, _d2;
-      activeConfig = {
+      const merged = {
         ...activeConfig,
         ...nextConfig,
         theme: { ...(_a2 = activeConfig.theme) != null ? _a2 : {}, ...(_b2 = nextConfig.theme) != null ? _b2 : {} },
         options: { ...(_c2 = activeConfig.options) != null ? _c2 : {}, ...(_d2 = nextConfig.options) != null ? _d2 : {} },
         events: mergeEvents(activeConfig.events, nextConfig.events)
       };
+      const nextUrl = buildEmbedUrl(merged, embedId);
+      activeConfig = merged;
+      expectedOrigin = new URL(nextUrl).origin;
       listeners = mergeEvents(listeners, nextConfig.events);
-      const nextUrl = buildEmbedUrl(activeConfig, embedId);
       if (iframe.src !== nextUrl) {
         iframe.src = nextUrl;
       }

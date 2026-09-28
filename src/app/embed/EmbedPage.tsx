@@ -271,7 +271,7 @@ export function EmbedPage() {
         <section className="panel embed-debug">
           <p><strong>Embed Debug</strong> v{EMBED_VERSION}</p>
           <p>Mode: {mode} | SDK: {sdkVersion}</p>
-          <p>Read-only sections: {readOnlySections.length > 0 ? readOnlySections.join(', ') : 'none'}</p>
+          <p>Read-only sections requested: {readOnlySections.length > 0 ? readOnlySections.join(', ') : 'none'} (metadata only, not enforced)</p>
           <p>Bridge: postMessage active</p>
         </section>
       ) : null}
