@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV-Embed integration example</title>
+  <!--
+    A minimal example of embedding CV-Embed in someone else's page.
+
+    Nothing here is CV-Embed code. This is an ordinary host page: it loads the
+    SDK from the CDN, renders a resume, reacts to the bridge events, and sends
+    commands back. Copy this file and change the resume and the baseUrl.
+  -->
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #16202c;
+      background: #f4f6f9;
+    }
+    main { max-width: 1080px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    p.lede { margin: 0 0 24px; color: #55637a; }
+    .layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+    @media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+    .card { background: #fff; border: 1px solid #dde3ec; border-radius: 10px; padding: 16px; }
+    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #6b7a90; margin: 0 0 12px; }
+    #resume { min-height: 320px; }
+    button {
+      font: inherit; font-size: 14px; padding: 7px 11px; margin: 0 6px 8px 0;
+      background: #fff; color: #16202c; border: 1px solid #c6d0de; border-radius: 7px; cursor: pointer;
+    }
+    button:hover { background: #eef2f8; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .status { font-size: 14px; margin: 0 0 10px; }
+    .status[data-state="ready"] { color: #0f7b4f; }
+    .status[data-state="error"] { color: #b3261e; }
+    ol#log { margin: 0; padding: 0; list-style: none; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 260px; overflow: auto; }
+    ol#log li { padding: 3px 0; border-bottom: 1px solid #eef1f6; color: #3c4a5e; }
+    ol#log li b { color: #16202c; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CV-Embed integration example</h1>
+    <p class="lede">A host page loading CV-Embed through the SDK. The panel on the right is this page's own UI, not CV-Embed's.</p>
+
+    <div class="layout">
+      <section class="card" aria-labelledby="resume-heading">
+        <h2 id="resume-heading">Embedded resume</h2>
+        <div id="resume"></div>
+      </section>
+
+      <div>
+        <section class="card" aria-labelledby="commands-heading">
+          <h2 id="commands-heading">Send to the embed</h2>
+          <p class="status" id="status" data-state="loading">Loading the SDK&hellip;</p>
+          <button type="button" id="btn-resume">Replace resume</button>
+          <button type="button" id="btn-focus">Focus Experience</button>
+          <button type="button" id="btn-export">Request export</button>
+          <button type="button" id="btn-hide">Hide download</button>
+          <button type="button" id="btn-sync">Re-sync</button>
+        </section>
+
+        <section class="card" aria-labelledby="log-heading" style="margin-top:20px">
+          <h2 id="log-heading">Events from the embed</h2>
+          <ol id="log" aria-live="polite" aria-relevant="additions"></ol>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="/sdk.js"></script>
+  <script>
+    // Point this at wherever CV-Embed is deployed. Required unless the SDK is
+    // loaded by a classic script tag from the same origin.
+    const CV_EMBED_BASE_URL = window.location.origin
+
+    const statusEl = document.getElementById('status')
+    const logEl = document.getElementById('log')
+    const buttons = ['btn-resume', 'btn-focus', 'btn-export', 'btn-hide', 'btn-sync']
+      .map((id) => document.getElementById(id))
+
+    function setStatus(text, state) {
+      statusEl.textContent = text
+      statusEl.dataset.state = state
+    }
+
+    function log(name, detail) {
+      const item = document.createElement('li')
+      item.innerHTML = '<b></b> <span></span>'
+      item.querySelector('b').textContent = name
+      item.querySelector('span').textContent = detail ?? ''
+      logEl.prepend(item)
+      while (logEl.children.length > 40) logEl.lastElementChild.remove()
+    }
+
+    const resume = {
+      meta: {
+        version: '1.0',
+        template: 'minimal',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        documentOptions: {},
+      },
+      basics: {
+        name: 'Ada Lovelace',
+        headline: 'Principal Engineer',
+        email: 'ada@example.com',
+        phone: '+44 20 7946 0000',
+        location: 'London, UK',
+        summary: 'Builds analytical engines and the teams that run them.',
+        links: [{ label: 'GitHub', url: 'https://github.com/example' }],
+      },
+      education: [{
+        institution: 'University of London', degree: 'BSc', field: 'Mathematics',
+        cgpa: '', startDate: '1832', endDate: '1835', location: 'London',
+      }],
+      experience: [{
+        company: 'Analytical Engine Co.', role: 'Principal Engineer', location: 'London',
+        startDate: '1840-01', endDate: '1852-01',
+        bullets: [
+          'Designed the first published algorithm intended for a machine.',
+          'Reduced tabular error reporting from six weeks to one day.',
+        ],
+      }],
+      projects: [{
+        title: 'Bernoulli Numbers', projectLink: 'https://example.com/bernoulli',
+        repoLink: '', techStack: ['Analytical Engine'], startDate: '1841', endDate: '1843',
+        bullets: ['Computed a table that had resisted manual methods.'],
+      }],
+      skills: { languages: ['Mathematics'], frameworks: [], tools: ['Analytical Engine'], other: [] },
+      certifications: [], accomplishments: [], activities: [], volunteering: [], publications: [],
+    }
+
+    if (!window.CVEmbed) {
+      setStatus('The SDK did not load. Check the script tag.', 'error')
+    } else {
+      log('SDK', `v${CVEmbed.version}, protocol ${CVEmbed.protocolVersion}`)
+
+      const instance = CVEmbed.render({
+        target: '#resume',
+        baseUrl: CV_EMBED_BASE_URL,
+        resumeData: resume,
+        theme: { primaryColor: '#3b5bdb', density: 'compact' },
+        events: {
+          onReady: (payload) => {
+            setStatus(`Ready — ${payload.template} template, score ${payload.score}`, 'ready')
+            log('ready', `score ${payload.score}, ${payload.showDownload ? 'download on' : 'download off'}`)
+            for (const button of buttons) button.disabled = false
+          },
+          onHeightChange: ({ height }) => log('heightChange', `${height}px`),
+          onValidationChange: (payload) => log('validationChange', `${payload.errorCount} errors, ${payload.warningCount} warnings`),
+          onSectionFocus: ({ section }) => log('sectionFocus', section),
+          onExport: (payload) => log('export', payload.action),
+          onError: ({ code, message }) => {
+            setStatus(`Embed error: ${message}`, 'error')
+            log('error', `${code}: ${message}`)
+          },
+        },
+      })
+
+      document.getElementById('btn-resume').addEventListener('click', () => {
+        // A replacement is a whole document. To "update" one field, copy the
+        // object you already have, change it, and send it back.
+        instance.send('setResume', {
+          resume: { ...resume, basics: { ...resume.basics, name: 'Ada King-Noel', headline: 'Mathematician' } },
+        })
+        log('sent', 'setResume')
+      })
+
+      document.getElementById('btn-focus').addEventListener('click', () => {
+        instance.send('focusSection', { section: 'Experience' })
+        log('sent', 'focusSection Experience')
+      })
+
+      document.getElementById('btn-export').addEventListener('click', () => {
+        instance.send('requestExport', { format: 'pdf' })
+        log('sent', 'requestExport pdf')
+      })
+
+      document.getElementById('btn-hide').addEventListener('click', () => {
+        instance.send('setOptions', { showDownload: false })
+        log('sent', 'setOptions showDownload=false')
+      })
+
+      document.getElementById('btn-sync').addEventListener('click', () => {
+        instance.send('syncState', {})
+        log('sent', 'syncState')
+      })
+    }
+  </script>
+</body>
+</html>
