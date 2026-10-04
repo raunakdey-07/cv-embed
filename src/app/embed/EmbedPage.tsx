@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { TemplateRenderer } from '../../components/templates/TemplateRenderer'
 import { loadEmbedResume } from '../../lib/storage'
-import { createBuilderHandoffUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl } from '../../lib/utils'
+import { createBuilderHandoffUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl, normalizeResume } from '../../lib/utils'
 import { validateResume } from '../../schema/validators'
-import type { TemplateName } from '../../types/resume'
+import { PROTOCOL_VERSION, SDK_VERSION, isUnsupportedProtocol, parseHostCommand } from '../../../sdk/protocol'
+import type { Resume, TemplateName } from '../../types/resume'
 
 type EmbedMode = 'preview' | 'guided' | 'edit'
 
@@ -15,7 +16,7 @@ interface StructuredIssue {
   message: string
 }
 
-const EMBED_VERSION = '2'
+const EMBED_VERSION = PROTOCOL_VERSION
 
 function inferIssueSection(message: string): string {
   const value = message.toLowerCase()
@@ -83,17 +84,28 @@ export function EmbedPage() {
   const [searchParams] = useSearchParams()
   const resumeLocation = `${location.pathname}${location.search}${location.hash}`
   const rootRef = useRef<HTMLElement>(null)
+  // Host-driven overrides arrive over postMessage and win over the URL, which
+  // only carries the initial configuration.
+  const [hostOptions, setHostOptions] = useState<{
+    primaryColor?: string | null
+    density?: 'comfortable' | 'compact' | null
+    showDownload?: boolean
+  }>({})
+  // Bumped by the syncState command to re-emit state to a late host.
+  const [syncNonce, setSyncNonce] = useState(0)
 
-  const showDownload = searchParams.get('showDownload') !== '0' && searchParams.get('disableDownload') !== '1'
-  const primaryColor = searchParams.get('primaryColor') ?? undefined
-  const density = searchParams.has('density')
-    ? searchParams.get('density') === 'compact' ? 'compact' : 'comfortable'
-    : undefined
+  const showDownload = hostOptions.showDownload
+    ?? (searchParams.get('showDownload') !== '0' && searchParams.get('disableDownload') !== '1')
+  const primaryColor = hostOptions.primaryColor ?? searchParams.get('primaryColor') ?? undefined
+  const density = hostOptions.density
+    ?? (searchParams.has('density')
+      ? searchParams.get('density') === 'compact' ? 'compact' : 'comfortable'
+      : undefined)
   const mode: EmbedMode = searchParams.get('mode') === 'guided' ? 'guided' : searchParams.get('mode') === 'edit' ? 'edit' : 'preview'
   const debugMode = searchParams.get('debug') === '1'
   const eventOrigin = normalizeTargetOrigin(searchParams.get('eventOrigin')) ?? getParentOrigin()
   const embedId = searchParams.get('embedId') ?? 'standalone'
-  const sdkVersion = searchParams.get('sdkVersion') ?? 'direct'
+  const sdkVersion = searchParams.get('sdkVersion') ?? SDK_VERSION
   const lockedTemplateParam = searchParams.get('lockedTemplate')
   const lockedTemplate: TemplateName | null = lockedTemplateParam === 'minimal' || lockedTemplateParam === 'compact'
     ? lockedTemplateParam
@@ -105,7 +117,7 @@ export function EmbedPage() {
   const fontScale = Math.max(0.9, Math.min(1.25, Number(searchParams.get('fontScale') ?? '1') || 1))
   const radius = Math.max(4, Math.min(14, Number(searchParams.get('radius') ?? '8') || 8))
 
-  const resume = useMemo(() => {
+  const initialResume = useMemo(() => {
     const encodedData = getResumeDataFromUrl(new URL(resumeLocation, window.location.origin))
     const loaded = encodedData ? decodeResumeFromUrl(encodedData) : null
     const source = loaded ?? (resumeId ? loadEmbedResume(resumeId) : null)
@@ -121,6 +133,10 @@ export function EmbedPage() {
         }
       : source
   }, [lockedTemplate, resumeId, resumeLocation])
+
+  // The host can replace the document over the bridge, so the rendered resume
+  // is state rather than a value derived from the URL.
+  const [resume, setResume] = useState<Resume | null>(initialResume)
 
   const builderHandoffUrl = useMemo(() => {
     if (!resume) return '/builder'
@@ -148,7 +164,7 @@ export function EmbedPage() {
     return `Prioritize ${issue.section}: ${issue.message}`
   }, [structuredIssues, validation])
 
-  const postBridgeEvent = useCallback((event: 'ready' | 'heightChange' | 'validationChange' | 'export' | 'sectionFocus', payload: Record<string, unknown>) => {
+  const postBridgeEvent = useCallback((event: 'ready' | 'heightChange' | 'validationChange' | 'export' | 'sectionFocus' | 'error', payload: Record<string, unknown>) => {
     if (window.parent === window || !eventOrigin) {
       return
     }
@@ -167,18 +183,18 @@ export function EmbedPage() {
   useEffect(() => {
     if (!resume || !validation) return
     postBridgeEvent('ready', {
-      mode,
+      protocolVersion: PROTOCOL_VERSION,
       sdkVersion,
+      mode,
       resumeId: resumeId ?? 'portable',
       showDownload,
-      readOnlySections,
       lockedTemplate: lockedTemplate ?? null,
+      template: resume.meta.template,
       score: validation.score,
       qualityScore: validation.qualityScore,
       completenessScore: validation.completenessScore,
-      template: resume.meta.template,
     })
-  }, [lockedTemplate, mode, postBridgeEvent, readOnlySections, resume, resumeId, sdkVersion, showDownload, validation])
+  }, [lockedTemplate, mode, postBridgeEvent, resume, resumeId, sdkVersion, showDownload, syncNonce, validation])
 
   useEffect(() => {
     if (!validation) return
@@ -229,7 +245,6 @@ export function EmbedPage() {
     if (!root) return
 
     const sections = root.querySelectorAll<HTMLElement>('.resume-template section')
-    if (sections.length === 0) return
     const seen = new Set<string>()
     const visibleSections = new Map<Element, number>()
     const observer = new IntersectionObserver((entries) => {
@@ -249,6 +264,104 @@ export function EmbedPage() {
     sections.forEach((section) => observer.observe(section))
     return () => observer.disconnect()
   }, [postBridgeEvent, resume])
+
+  // Inbound host commands. The frame is the untrusted side here: a page that
+  // embeds it controls window.parent, so every message is checked against the
+  // parent window, the configured parent origin, this embed's id, the protocol
+  // version, and the per-command schema before anything happens.
+  useEffect(() => {
+    if (window.parent === window) return
+
+    const parentOrigin = normalizeTargetOrigin(eventOrigin) ?? getParentOrigin()
+    if (!parentOrigin) return
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return
+      if (parentOrigin !== '*' && event.origin !== parentOrigin) return
+
+      const command = parseHostCommand(event.data, embedId)
+      if (!command) {
+        // Only report messages that are recognisably ours, so the error event
+        // cannot be used to amplify unrelated traffic from other frames.
+        if (isUnsupportedProtocol(event.data)) {
+          postBridgeEvent('error', {
+            code: 'unsupported-protocol',
+            message: `Host speaks protocol "${String((event.data as { version?: unknown }).version)}", this embed speaks "${PROTOCOL_VERSION}".`,
+            fatal: true,
+          })
+        }
+        return
+      }
+
+      switch (command.command) {
+        case 'syncState':
+          // The ready and validationChange effects re-fire on their own when
+          // their inputs change; bumping the key forces a re-emit for a host
+          // that attached after the first handshake.
+          setSyncNonce((value) => value + 1)
+          return
+        case 'setResume': {
+          const incoming = command.payload.resume
+          // normalizeResume fills every gap from defaults, so an arbitrary
+          // object would quietly become a blank CV and wipe what is on screen.
+          // A bridge replacement must at least look like a resume before it is
+          // allowed to replace one.
+          if (typeof incoming !== 'object' || incoming === null || !('basics' in incoming)) {
+            postBridgeEvent('error', {
+              code: 'resume-invalid',
+              message: 'setResume was rejected: the payload does not look like a CV-Embed document.',
+              fatal: false,
+            })
+            return
+          }
+          let next: Resume
+          try {
+            next = normalizeResume(incoming)
+          } catch {
+            postBridgeEvent('error', {
+              code: 'resume-invalid',
+              message: 'setResume was rejected: the document did not match the CV-Embed schema.',
+              fatal: false,
+            })
+            return
+          }
+          setResume(lockedTemplate ? { ...next, meta: { ...next.meta, template: lockedTemplate } } : next)
+          return
+        }
+        case 'focusSection': {
+          const target = command.payload.section.trim().toLowerCase()
+          const heading = [...document.querySelectorAll<HTMLElement>('.resume-template section h2')]
+            .find((node) => (node.textContent ?? '').trim().toLowerCase() === target)
+          if (!heading) {
+            postBridgeEvent('error', {
+              code: 'command-failed',
+              message: `focusSection could not find "${command.payload.section}" in the rendered document.`,
+              fatal: false,
+            })
+            return
+          }
+          const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          heading.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+          heading.setAttribute('tabindex', '-1')
+          heading.focus({ preventScroll: true })
+          return
+        }
+        case 'requestExport':
+          postBridgeEvent('export', { action: 'open-builder', url: builderHandoffUrl })
+          return
+        case 'setOptions':
+          setHostOptions({
+            primaryColor: command.payload.primaryColor,
+            density: command.payload.density,
+            showDownload: command.payload.showDownload,
+          })
+          return
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [builderHandoffUrl, embedId, eventOrigin, lockedTemplate, postBridgeEvent])
 
   if (!resume) {
     return (

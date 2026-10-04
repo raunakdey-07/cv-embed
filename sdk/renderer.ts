@@ -1,3 +1,13 @@
+import {
+  EMBED_SOURCE,
+  HOST_SOURCE,
+  PROTOCOL_VERSION,
+  SDK_VERSION,
+  parseEmbedEvent,
+  type EmbedEventName,
+  type HostCommandName,
+} from './protocol'
+
 export interface CVEmbedTheme {
   primaryColor?: string
   density?: 'normal' | 'compact'
@@ -13,28 +23,37 @@ export interface CVEmbedOptions {
   /**
    * Metadata only. The embedded resume is always read-only: it renders a
    * template with no editing surface, so there is nothing for this to lock.
-   * It is forwarded to the frame and reported in the `ready` payload so a host
-   * can read back what it requested. It is NOT a security control and must not
-   * be relied on to hide data from the viewer.
+   * It is reported back in the `ready` payload so a host can read what it
+   * requested. It is NOT a security control and must not be relied on to hide
+   * data from the viewer.
    */
   readOnlySections?: string[]
   lockedTemplate?: 'minimal' | 'compact'
   /**
    * Metadata only, for the same reason as readOnlySections. The embed exposes
-   * no import control, and the resume lives in the URL fragment the host
+   * no import control, and the resume travels in the URL fragment the host
    * itself supplied. It is NOT a security control.
    */
   disableImport?: boolean
   disableDownload?: boolean
+  /** Origin that receives bridge events. Defaults to the host page origin. */
   eventTargetOrigin?: string
 }
 
+export interface CVEmbedErrorPayload {
+  code: string
+  message: string
+  fatal: boolean
+}
+
 export interface CVEmbedEvents {
-  onReady?: (payload: unknown) => void
+  onReady?: (payload: Record<string, unknown>) => void
   onHeightChange?: (payload: { height: number }) => void
-  onValidationChange?: (payload: unknown) => void
-  onExport?: (payload: unknown) => void
-  onSectionFocus?: (payload: unknown) => void
+  onValidationChange?: (payload: Record<string, unknown>) => void
+  onSectionFocus?: (payload: { section: string }) => void
+  onExport?: (payload: Record<string, unknown>) => void
+  onError?: (payload: CVEmbedErrorPayload) => void
+  /** Every validated protocol event, after schema validation, before dispatch. */
   onMessage?: (event: CVEmbedBridgeEvent) => void
 }
 
@@ -52,20 +71,35 @@ export interface CVEmbedConfig {
 }
 
 export interface CVEmbedBridgeEvent {
-  source: 'cv-embed'
-  version: '2'
-  event: 'ready' | 'heightChange' | 'validationChange' | 'export' | 'sectionFocus'
+  source: typeof EMBED_SOURCE
+  version: typeof PROTOCOL_VERSION
+  event: EmbedEventName
   embedId: string
   payload: Record<string, unknown>
+}
+
+export type CVEmbedHostCommand = HostCommandName
+export type CVEmbedHostCommandPayloads = {
+  syncState: Record<string, never>
+  setResume: { resume: unknown }
+  focusSection: { section: string }
+  requestExport: { format: 'pdf' | 'docx' | 'json' }
+  setOptions: { primaryColor?: string | null; density?: 'comfortable' | 'compact' | null; showDownload?: boolean }
 }
 
 export interface CVEmbedInstance {
   destroy: () => void
   update: (nextConfig: Partial<CVEmbedConfig>) => void
-  getIframe: () => HTMLIFrameElement | null
+  getIframe: () => HTMLIFrameElement
+  /** Sends a validated command to the embedded frame. */
+  send: <T extends CVEmbedHostCommand>(command: T, payload: CVEmbedHostCommandPayloads[T]) => boolean
+  isReady: () => boolean
   on: <K extends keyof CVEmbedEvents>(eventName: K, handler: NonNullable<CVEmbedEvents[K]>) => void
   off: <K extends keyof CVEmbedEvents>(eventName: K, handler?: NonNullable<CVEmbedEvents[K]>) => void
 }
+
+/** Hard ceiling on iframe height, matching the ceiling the embed reports. */
+const MAX_IFRAME_HEIGHT = 10000
 
 function encodeResumeData(resumeData: unknown): string {
   const json = JSON.stringify(resumeData)
@@ -167,7 +201,8 @@ export function buildEmbedUrl(config: CVEmbedConfig, embedId?: string): string {
     url.searchParams.set('radius', String(config.theme.radius))
   }
 
-  url.searchParams.set('sdkVersion', '2')
+  url.searchParams.set('sdkVersion', SDK_VERSION)
+  url.searchParams.set('protocolVersion', PROTOCOL_VERSION)
   if (embedId) {
     url.searchParams.set('embedId', embedId)
   }
@@ -190,6 +225,7 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
 
   let activeConfig = { ...config }
   let listeners = mergeEvents(config.events)
+  let ready = false
   const embedId = randomEmbedId()
 
   const iframe = document.createElement('iframe')
@@ -204,44 +240,76 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   iframe.style.border = '0'
   iframe.setAttribute('loading', 'lazy')
   iframe.setAttribute('title', config.title ?? 'Embedded CV-Embed Resume')
+  // Keeps the full URL out of the frame's Referer on cross-origin embeds.
   iframe.referrerPolicy = 'strict-origin-when-cross-origin'
+  iframe.setAttribute('allow', 'clipboard-write')
+
+  const appliedHeight = () => Math.max(0, Math.min(MAX_IFRAME_HEIGHT, Math.round(Number(iframe.height) || 0)))
+
+  const emitError = (code: string, message: string, fatal = false) => {
+    listeners.onError?.({ code, message, fatal })
+  }
 
   const onMessage = (event: MessageEvent) => {
+    // Two independent checks: the message must come from this frame, and from
+    // the origin the frame was configured to load from. A page that embeds or
+    // is embedded elsewhere cannot satisfy both.
     if (event.source !== iframe.contentWindow || event.origin !== expectedOrigin) {
       return
     }
 
-    const data = event.data as CVEmbedBridgeEvent | undefined
-    if (!data || data.source !== 'cv-embed' || data.version !== '2' || data.embedId !== embedId || !data.payload || typeof data.payload !== 'object') {
+    const parsed = parseEmbedEvent(event.data, embedId)
+    if (!parsed) {
       return
     }
 
-    listeners.onMessage?.(data)
+    listeners.onMessage?.(parsed)
 
-    if (data.event === 'ready') listeners.onReady?.(data.payload)
-    if (data.event === 'validationChange') listeners.onValidationChange?.(data.payload)
-    if (data.event === 'sectionFocus') listeners.onSectionFocus?.(data.payload)
-    if (data.event === 'export') listeners.onExport?.(data.payload)
-    if (data.event === 'heightChange') {
-      const nextHeight = Number(data.payload.height)
-      if (activeConfig.options?.autoHeight !== false && Number.isFinite(nextHeight) && nextHeight > 0) {
-        const appliedHeight = Math.min(10000, Math.round(nextHeight))
-        iframe.height = String(appliedHeight)
-        listeners.onHeightChange?.({ height: appliedHeight })
+    switch (parsed.event) {
+      case 'ready':
+        ready = true
+        listeners.onReady?.(parsed.payload)
+        return
+      case 'validationChange':
+        listeners.onValidationChange?.(parsed.payload)
+        return
+      case 'sectionFocus':
+        listeners.onSectionFocus?.({ section: String(parsed.payload.section) })
+        return
+      case 'export':
+        listeners.onExport?.(parsed.payload)
+        return
+      case 'error':
+        emitError(
+          String(parsed.payload.code),
+          String(parsed.payload.message),
+          parsed.payload.fatal === true,
+        )
+        return
+      case 'heightChange': {
+        if (activeConfig.options?.autoHeight === false) {
+          listeners.onHeightChange?.({ height: appliedHeight() })
+          return
+        }
+        const height = Math.min(MAX_IFRAME_HEIGHT, Math.round(Number(parsed.payload.height)))
+        if (height <= 0) {
+          // Never collapse the frame; report what it is actually sized to.
+          listeners.onHeightChange?.({ height: appliedHeight() })
+          return
+        }
+        iframe.height = String(height)
+        listeners.onHeightChange?.({ height })
         return
       }
-      // Report what the iframe is actually sized to, never a rejected value
-      // that a host would write straight into its own layout.
-      listeners.onHeightChange?.({ height: Math.max(0, Math.min(10000, Math.round(Number(iframe.height) || 0))) })
     }
   }
 
   window.addEventListener('message', onMessage)
 
-  target.innerHTML = ''
-  target.appendChild(iframe)
+  target.replaceChildren(iframe)
 
   const destroy = () => {
+    ready = false
     window.removeEventListener('message', onMessage)
     if (activeInstances.get(target) === instance) {
       activeInstances.delete(target)
@@ -249,6 +317,16 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
     if (iframe.parentElement === target) {
       target.removeChild(iframe)
     }
+  }
+
+  const send = <T extends CVEmbedHostCommand>(command: T, payload: CVEmbedHostCommandPayloads[T]): boolean => {
+    const frame = iframe.contentWindow
+    if (!frame) return false
+    frame.postMessage(
+      { source: HOST_SOURCE, version: PROTOCOL_VERSION, command, embedId, payload },
+      expectedOrigin,
+    )
+    return true
   }
 
   const update = (nextConfig: Partial<CVEmbedConfig>) => {
@@ -268,8 +346,9 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
     activeConfig = merged
     expectedOrigin = new URL(nextUrl).origin
     listeners = mergeEvents(listeners, nextConfig.events)
-
+    // A reload creates a new document that has not handshaken yet.
     if (iframe.src !== nextUrl) {
+      ready = false
       iframe.src = nextUrl
     }
 
@@ -297,6 +376,8 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   const instance: CVEmbedInstance = {
     destroy,
     update,
+    send,
+    isReady: () => ready,
     getIframe: () => iframe,
     on,
     off,
@@ -304,3 +385,6 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   activeInstances.set(target, instance)
   return instance
 }
+
+export { EMBED_EVENTS, HOST_COMMANDS, PROTOCOL_VERSION, SDK_VERSION } from './protocol'
+export type { EmbedEventName, HostCommandName } from './protocol'

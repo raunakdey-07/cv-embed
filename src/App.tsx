@@ -1,7 +1,12 @@
+import { Suspense, lazy } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { BuilderPage } from './app/builder/BuilderPage'
-import { EmbedPage } from './app/embed/EmbedPage'
 import { IconLink, IconUpload } from './components/ui/Icons'
+
+// The embed route carries the bridge protocol and its schemas. Splitting it
+// keeps that off the builder's critical path, which is the route most visitors
+// and every first visit land on.
+const EmbedPage = lazy(() => import('./app/embed/EmbedPage').then((module) => ({ default: module.EmbedPage })))
 
 function HeaderEmbedButton() {
   const toggle = () => {
@@ -76,7 +81,14 @@ function App() {
       <Routes>
         <Route path="/" element={<BuilderPage />} />
         <Route path="/builder" element={<BuilderPage />} />
-        <Route path="/embed/:resumeId" element={<EmbedPage />} />
+        <Route
+          path="/embed/:resumeId"
+          element={
+            <Suspense fallback={<main id="main-content" className="app-main single-pane" />}>
+              <EmbedPage />
+            </Suspense>
+          }
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
