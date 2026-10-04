@@ -1,6 +1,47 @@
 # CV-Embed — Build, Export, and Embed ATS-Friendly Resumes
 
-CV-Embed is a fast resume builder built with React + TypeScript. It gives you a focused editing experience, live preview, PDF/DOCX export, and embed-ready sharing for portfolios, placement portals, and personal sites.
+CV-Embed is a resume builder built with React + TypeScript. Use it as a standalone
+app at `/builder`, or embed a live resume in your own page with the SDK.
+
+## Embedding in another application
+
+Load the SDK from a script tag and render into any element. This is a real host
+page, not a screenshot: it initializes, waits for `ready`, replaces the resume,
+sends commands, and reacts to errors.
+
+```html
+<script src="https://your-domain.com/sdk.js"></script>
+<div id="resume"></div>
+<script>
+  const embed = CVEmbed.render({
+    target: '#resume',
+    baseUrl: 'https://your-domain.com',
+    resumeData: {/* a normalized CV-Embed document */},
+    events: {
+      onReady: ({ score }) => console.log('ready, score', score),
+      onHeightChange: ({ height }) => console.log('height', height),
+      onValidationChange: ({ issues }) => console.log('issues', issues.length),
+      onExport: ({ action }) => console.log('export', action),
+      onError: ({ code, message }) => console.warn(code, message),
+    },
+  });
+
+  embed.send('setResume', { resume: nextDocument });
+  embed.send('focusSection', { section: 'Experience' });
+  embed.destroy();
+</script>
+```
+
+- A complete runnable example: [`public/example-host.html`](public/example-host.html),
+  served at `/example-host.html`.
+- Full message contract, payload shapes, and version rules:
+  [`docs/SDK_PROTOCOL.md`](docs/SDK_PROTOCOL.md).
+- Interactive playground for debugging: `/sdk-playground.html`.
+
+The iframe is a real cross-origin boundary. Messages are checked by window,
+origin, embed id, protocol version, and payload schema on both sides. See
+[What the bridge actually checks](docs/SDK_PROTOCOL.md#what-the-bridge-actually-checks)
+for exactly what is enforced, including the limits.
 
 ## Features
 
@@ -12,7 +53,7 @@ CV-Embed is a fast resume builder built with React + TypeScript. It gives you a 
 - **Export Options**: Download polished resumes as **PDF**, **DOCX**, and raw **JSON**. PDF export stops with a clear message when the built-in PDF fonts cannot represent the entered characters; DOCX remains Unicode-capable.
 - **Mobile UX**: Lazy-loaded PDF engine, smooth edit↔preview pane transition, taller nav bar, format dropdown beside organize, and responsive embed panel.
 - **Embed Toolkit**: Friendly snippets, live preview iframe, SDK v2, and user-friendly dropdown flow.
-- **SDK v2 Bridge**: `postMessage` event API (`ready`, `heightChange`, `validationChange`, `sectionFocus`, `export`) with callback hooks.
+- **SDK v2 Bridge**: a two-way `postMessage` protocol. Events out (`ready`, `heightChange`, `validationChange`, `sectionFocus`, `export`, `error`), commands in (`syncState`, `setResume`, `focusSection`, `requestExport`, `setOptions`). Every message is schema-validated.
 - **Auto-height Embeds**: Resize-aware iframe integration for portal layouts.
 - **Integration Pack Copy**: One-click copy for URL + iframe + React + SDK + event contract.
 - **Host Controls**: Guided mode, debug mode, locked template, read-only metadata, and builder-link visibility. See the SDK contract for current limits.
@@ -70,33 +111,46 @@ npm run bench:server # Run local Chromium benchmark server
 
 ## Embed Example (SDK v2)
 
-```html
-<script src="https://your-domain.com/sdk.js?v=2"></script>
-<div id="resume-container"></div>
-<script>
-   const embed = CVEmbed.render({
-    target: '#resume-container',
-    baseUrl: 'https://your-domain.com',
-    resumeData: {/* normalized resume JSON */},
-      options: {
-         showDownload: false,
-         autoHeight: true,
-         mode: 'guided',
-         eventTargetOrigin: window.location.origin
-      },
-      events: {
-         onReady: (payload) => console.log('ready', payload),
-         onHeightChange: ({ height }) => console.log('height', height),
-         onValidationChange: (payload) => console.log('validation', payload),
-         onSectionFocus: (payload) => console.log('section', payload),
-         onExport: (payload) => console.log('export', payload)
-      }
-  });
+See [Embedding in another application](#embedding-in-another-application) above
+for the shortest version, and [`docs/SDK_PROTOCOL.md`](docs/SDK_PROTOCOL.md) for
+every field. The full option list:
 
-   // Optional lifecycle helpers
-   // embed.update({ options: { mode: 'preview' } });
-   // embed.destroy();
-</script>
+```ts
+const embed = CVEmbed.render({
+  target: '#resume-container',        // selector or element, required
+  baseUrl: 'https://your-domain.com', // origin serving /embed/:id
+  resumeId: undefined,                // or resumeId, or one of resumeData
+  resumeData: {/* normalized resume JSON */},
+  width: '100%',
+  height: 1100,                       // starting height; autoHeight takes over
+  title: 'Resume of Ada Lovelace',    // iframe title, used by screen readers
+  theme: {
+    primaryColor: '#3b5bdb',
+    density: 'normal',                // 'normal' | 'compact'
+    fontScale: 1,                     // 0.9 - 1.25
+    radius: 8,                        // 4 - 14
+  },
+  options: {
+    autoHeight: true,
+    mode: 'preview',                  // 'preview' | 'guided' | 'edit'
+    showDownload: true,
+    disableDownload: false,
+    debug: false,
+    lockedTemplate: undefined,        // 'minimal' | 'compact'
+    readOnlySections: [],             // metadata only, not enforced
+    disableImport: false,             // metadata only, not enforced
+    eventTargetOrigin: window.location.origin,
+  },
+  events: { /* see below */ },
+});
+
+// Lifecycle
+embed.isReady();                                   // has the frame handshaken?
+embed.update({ resumeData: next });                // transactional: a bad value throws and changes nothing
+embed.send('focusSection', { section: 'Projects' });
+embed.on('onError', ({ code, message }) => {});    // register later
+embed.off('onError');
+embed.destroy();
 ```
 
 ## SDK v2 Options
@@ -105,7 +159,7 @@ npm run bench:server # Run local Chromium benchmark server
 - `options.autoHeight` (default `true`): auto-resize iframe based on embed content.
 - `options.mode`: `preview | guided | edit`.
 - `options.debug`: render integration diagnostics inside embed.
-- `options.readOnlySections`: **metadata only, not enforced.** The embedded resume is always read-only because it renders a template with no editing surface. The value is forwarded to the frame and reported in the `ready` payload so a host can read back what it requested. Do not use it as a security control.
+- `options.readOnlySections`: **metadata only, not enforced.** The embedded resume is always read-only because it renders a template with no editing surface. The value is reported in the `ready` payload so a host can read back what it requested. Do not use it as a security control.
 - `options.lockedTemplate`: lock render template to `minimal` or `compact`.
 - `options.disableImport`: **metadata only, not enforced.** The embed exposes no import control. Do not use it as a security control.
 - `options.disableDownload`: force hide builder CTA.
@@ -113,21 +167,34 @@ npm run bench:server # Run local Chromium benchmark server
 - `theme.fontScale`: scale resume typography (0.9 - 1.25).
 - `theme.radius`: host border radius token (4 - 14).
 
-## Event Payload Contract
+## Versions
 
-The iframe posts messages shaped like:
-
-```json
-{
-   "source": "cv-embed",
-   "version": "2",
-   "event": "ready|heightChange|validationChange|sectionFocus|export",
-   "embedId": "cvembed_xxxxxxxx",
-   "payload": {}
-}
+```js
+CVEmbed.version          // SDK package version, e.g. "2.1.0"
+CVEmbed.protocolVersion  // wire protocol version, currently "2"
 ```
 
-`validationChange` includes a machine-readable `issues` array with `severity`, `section`, `code`, and `message`.
+A message carrying a different `version` is dropped. The embed additionally
+answers a foreign-version command with an `error` event using code
+`unsupported-protocol`, so a mismatched host finds out instead of going quiet.
+Breaking changes bump the protocol version; non-breaking releases do not. What
+counts as breaking is listed in the protocol document.
+
+## Event and Command Contract
+
+Full shapes, firing conditions, and failure behaviour live in
+[`docs/SDK_PROTOCOL.md`](docs/SDK_PROTOCOL.md). In short:
+
+```json
+{ "source": "cv-embed", "version": "2", "event": "ready", "embedId": "cvembed_xxxxxxxx", "payload": {} }
+```
+
+```json
+{ "source": "cv-embed-host", "version": "2", "command": "setResume", "embedId": "cvembed_xxxxxxxx", "payload": { "resume": {} } }
+```
+
+`validationChange` includes a machine-readable `issues` array with `severity`,
+`section`, `code`, and `message`.
 
 ## SDK Playground
 
