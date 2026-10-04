@@ -17,6 +17,7 @@ const FIREFOX_SUITE = [
   'pane-transition.spec.ts',
   'embed-panel.spec.ts',
   'embed-reliability.spec.ts',
+  'sdk-contract.spec.ts',
   'pdf-lazy-load.spec.ts',
 ]
 
