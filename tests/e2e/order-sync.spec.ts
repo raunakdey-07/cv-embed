@@ -48,6 +48,12 @@ test('order + visibility drive form, nav, and preview together', async ({ page, 
   )
   expect(ids2.indexOf('section-experience')).toBeLessThan(ids2.indexOf('section-education'))
 
+  // Nav reordered to match. This is the assertion the test was named for and
+  // was missing: the tab strip used to be built from a static list, so it kept
+  // the default order no matter what the organize sheet did.
+  const navLabels = await page.locator('.section-nav-tabs .nav-tab').allTextContents()
+  expect(navLabels.indexOf('Experience')).toBeLessThan(navLabels.indexOf('Education'))
+
   // Preview reordered.
   const headings2 = await page.locator('.resume-template h2').allTextContents()
   expect(headings2.indexOf('Experience')).toBeLessThan(headings2.indexOf('Education'))

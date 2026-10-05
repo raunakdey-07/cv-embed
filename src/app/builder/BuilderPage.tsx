@@ -801,7 +801,16 @@ export function BuilderPage() {
     if (id !== 'document-options' && !resume.meta.documentOptions.showSections[id as ResumeSectionKey]) return
     setActiveSection(id)
     if (isMobileLayout) setMobileView('edit')
-    document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest' })
+    // Move focus into the section as well as scrolling to it. Without this a
+    // keyboard user who activates a nav tab is still standing on the tab, and
+    // the next Tab goes to the following tab rather than into the section they
+    // just chose. Same pattern as jumpToFirstIssue.
+    requestAnimationFrame(() => {
+      const target = document.getElementById(`section-${id}`)
+      target?.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest' })
+      const field = target?.querySelector<HTMLElement>('input, textarea, select')
+      ;(field ?? target)?.focus({ preventScroll: true })
+    })
   }
 
   const sectionCls = (id: SectionId) =>
@@ -846,12 +855,20 @@ export function BuilderPage() {
     })
   }, [])
 
-  const navSections: NavSection[] = SECTION_NAV.map((s) => ({
-    id: s.id,
-    label: s.label,
-    active: activeSection === s.id,
-    hidden: s.id !== 'document-options' && !resume.meta.documentOptions.showSections[s.id as ResumeSectionKey],
-  }))
+  // The nav strip follows the configured section order, the same as the form
+  // panels, the preview, and every export. Basics and Format are editor chrome
+  // rather than resume sections, so they stay pinned at the front.
+  const navSections: NavSection[] = useMemo(() => {
+    const meta = new Map(SECTION_NAV.map((s) => [s.id, s]))
+    const leading = (['basics', 'document-options'] as SectionId[]).filter((id) => meta.has(id))
+    const ordered = getOrderedSectionIds(resume).filter((id) => meta.has(id))
+    return [...leading, ...ordered].map((id) => ({
+      id,
+      label: meta.get(id)!.label,
+      active: activeSection === id,
+      hidden: id !== 'document-options' && !resume.meta.documentOptions.showSections[id as ResumeSectionKey],
+    }))
+  }, [activeSection, resume])
 
   // Only render editor panels for sections enabled in the resume; hidden
   // sections drop out of the nav too so the editing flow matches the output.
