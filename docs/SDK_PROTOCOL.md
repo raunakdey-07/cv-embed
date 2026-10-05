@@ -98,13 +98,24 @@ Scrolls a section heading into view and moves focus to it, honouring
 
 ### `requestExport`
 
-Asks the embed to report its export route.
+Asks where the embed sends a viewer who wants the document as a file. The embed
+renders and routes; it never generates a file itself.
 
 - payload: `{ format: 'pdf' | 'docx' | 'json' }`, defaults to `pdf`
 - repeatable: yes
-- always answered with an `export` event
-- the embed does not generate a file from this. It reports the route a host can
-  send the viewer to. Download formats live in the builder
+- answered with an `export` event carrying `requestedFormat`, the format you
+  asked for, so you can match the reply to this request. A reader who takes the
+  builder link reports `requestedFormat: null`, which is how the two triggers
+  stay distinguishable
+- the reply carries `url`, a builder link holding your document in its
+  fragment. Send the viewer there. The format you named is honoured by the
+  builder, not by the embed
+- a `format` outside the list is refused with an `error` event using code
+  `command-failed`, rather than being dropped in silence
+- a document too large for a portable link is refused with `resume-too-large`.
+  It has no handoff, so the embed reports that instead of returning a bare
+  builder URL that would open an empty editor
+- formats: PDF, DOCX, and JSON, all produced in the builder
 
 ### `setOptions`
 
@@ -158,7 +169,10 @@ whenever the rendered state changes.
 
 ### `export`
 
-- payload: `{ action: 'open-builder' | 'open-builder-edit', url?: string }`
+- payload: `{ action: 'open-builder' | 'open-builder-edit', url, requestedFormat }`
+- `requestedFormat` is the format a host asked for in `requestExport`, or `null`
+  when the reader took the builder link themselves. Both triggers send the same
+  shape, so a host can always tell which one it is looking at
 - fires when the reader takes the download control, and in answer to
   `requestExport`
 - repeatable: yes
@@ -166,8 +180,8 @@ whenever the rendered state changes.
 ### `error`
 
 - payload: `code`, `message`, `fatal`
-- `code` is one of `invalid-message`, `unsupported-protocol`, `resume-invalid`,
-  `resume-too-large`, `command-failed`
+- `code` is one of `unsupported-protocol`, `resume-invalid`, `resume-too-large`,
+  `command-failed`
 - `fatal: true` means the bridge cannot continue and the host should stop
   sending commands
 - fires when the embed refuses something the host asked for, or when it
@@ -203,9 +217,11 @@ What this does **not** give you:
 
 - The embed does not authenticate the host. Any page that embeds the frame is
   the host, and can send any valid command. There is no shared secret.
-- `options.readOnlySections` and `options.disableImport` are metadata, not
-  enforcement. The embed renders a read-only template with no editing surface,
-  so there is nothing for them to lock. Do not treat them as access control.
+- The embedded view is read-only. It renders a template with no editing surface,
+  so there is no per-section access control to configure, and no import control
+  to disable. Earlier versions accepted `readOnlySections` and `disableImport`
+  options that changed nothing; both are removed rather than shipped as
+  decorative configuration.
 - Resume content travels in the URL fragment, so the host already holds it.
   Anything you do not want the host to read, do not send to the embed.
 
@@ -215,10 +231,13 @@ What this does **not** give you:
 real embed route. It covers the handshake, every host command, every event, and
 the rejection paths: wrong window, wrong origin, wrong `embedId`, wrong source,
 unknown names, bad payloads, foreign versions, oversized heights, commands sent
-before the handshake, and a destroyed instance.
+before the handshake, and a destroyed instance. Export coverage includes a
+supported format, an unsupported one, a missing payload, and the correlation
+between a host request and a reader click.
 
 `tests/e2e/example-host.spec.ts` runs the published example end to end, so the
 documentation cannot drift from working code.
 
 `sdk/protocol.test.ts` covers the schemas directly, including every rejection
-the contract promises.
+the contract promises. `sdk/artifact.test.ts` proves the build's own artifact
+check rejects each way the bundle can silently lose its public surface.

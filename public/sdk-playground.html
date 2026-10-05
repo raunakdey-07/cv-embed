@@ -178,10 +178,6 @@
           <label><input id="disableDownload" type="checkbox" /> disableDownload</label>
         </div>
 
-        <label>Read-only Sections (comma separated)
-          <input id="readOnlySections" type="text" placeholder="basics,education,skills" />
-        </label>
-
         <label>Resume JSON
           <textarea id="resumeJson"></textarea>
         </label>
@@ -269,7 +265,6 @@
       var autoHeight = document.getElementById("autoHeight");
       var debug = document.getElementById("debug");
       var disableDownload = document.getElementById("disableDownload");
-      var readOnlySections = document.getElementById("readOnlySections");
       var lockedTemplate = document.getElementById("lockedTemplate");
       var eventLog = document.getElementById("eventLog");
       var statusLine = document.getElementById("statusLine");
@@ -295,11 +290,6 @@
           throw err;
         }
 
-        var ro = readOnlySections.value
-          .split(",")
-          .map(function (value) { return value.trim(); })
-          .filter(Boolean);
-
         return {
           target: "#embed-target",
           baseUrl: baseUrl.value.trim() || window.location.origin,
@@ -317,7 +307,6 @@
             debug: !!debug.checked,
             disableDownload: !!disableDownload.checked,
             lockedTemplate: lockedTemplate.value || undefined,
-            readOnlySections: ro,
             eventTargetOrigin: window.location.origin
           },
           events: {

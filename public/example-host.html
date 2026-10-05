@@ -155,7 +155,7 @@
           onHeightChange: ({ height }) => log('heightChange', `${height}px`),
           onValidationChange: (payload) => log('validationChange', `${payload.errorCount} errors, ${payload.warningCount} warnings`),
           onSectionFocus: ({ section }) => log('sectionFocus', section),
-          onExport: (payload) => log('export', payload.action),
+          onExport: (payload) => log('export', `${payload.requestedFormat ? 'host asked ' + payload.requestedFormat : 'reader clicked'}`),
           onError: ({ code, message }) => {
             setStatus(`Embed error: ${message}`, 'error')
             log('error', `${code}: ${message}`)
@@ -178,6 +178,9 @@
       })
 
       document.getElementById('btn-export').addEventListener('click', () => {
+        // The embed does not generate a file. It replies with the builder route
+        // and echoes back requestedFormat, so this log line tells you which of
+        // the two triggers you are looking at.
         instance.send('requestExport', { format: 'pdf' })
         log('sent', 'requestExport pdf')
       })

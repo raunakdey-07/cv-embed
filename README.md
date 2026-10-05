@@ -21,7 +21,7 @@ sends commands, and reacts to errors.
       onReady: ({ score }) => console.log('ready, score', score),
       onHeightChange: ({ height }) => console.log('height', height),
       onValidationChange: ({ issues }) => console.log('issues', issues.length),
-      onExport: ({ action }) => console.log('export', action),
+      onExport: ({ requestedFormat }) => console.log('export route', requestedFormat ?? 'reader-initiated'),
       onError: ({ code, message }) => console.warn(code, message),
     },
   });
@@ -56,7 +56,7 @@ for exactly what is enforced, including the limits.
 - **SDK v2 Bridge**: a two-way `postMessage` protocol. Events out (`ready`, `heightChange`, `validationChange`, `sectionFocus`, `export`, `error`), commands in (`syncState`, `setResume`, `focusSection`, `requestExport`, `setOptions`). Every message is schema-validated.
 - **Auto-height Embeds**: Resize-aware iframe integration for portal layouts.
 - **Integration Pack Copy**: One-click copy for URL + iframe + React + SDK + event contract.
-- **Host Controls**: Guided mode, debug mode, locked template, read-only metadata, and builder-link visibility. See the SDK contract for current limits.
+- **Host Controls**: Guided mode, debug mode, locked template, and builder-link visibility. The embed is read-only by construction; see the SDK contract for what that rules out.
 - **Validation & Scoring**: Visibility-aware error and warning checks with a resume quality score indicator.
 - **Draft Persistence**: Saves progress in guarded local browser storage so your data survives refreshes and tab changes.
 - **Portable Data**: Import/export normalized resume JSON for backup and migration. Portable links keep resume data in the URL fragment, where the browser does not send it in the HTTP request. Anyone with the link can still read the CV.
@@ -137,8 +137,6 @@ const embed = CVEmbed.render({
     disableDownload: false,
     debug: false,
     lockedTemplate: undefined,        // 'minimal' | 'compact'
-    readOnlySections: [],             // metadata only, not enforced
-    disableImport: false,             // metadata only, not enforced
     eventTargetOrigin: window.location.origin,
   },
   events: { /* see below */ },
@@ -159,9 +157,7 @@ embed.destroy();
 - `options.autoHeight` (default `true`): auto-resize iframe based on embed content.
 - `options.mode`: `preview | guided | edit`.
 - `options.debug`: render integration diagnostics inside embed.
-- `options.readOnlySections`: **metadata only, not enforced.** The embedded resume is always read-only because it renders a template with no editing surface. The value is reported in the `ready` payload so a host can read back what it requested. Do not use it as a security control.
 - `options.lockedTemplate`: lock render template to `minimal` or `compact`.
-- `options.disableImport`: **metadata only, not enforced.** The embed exposes no import control. Do not use it as a security control.
 - `options.disableDownload`: force hide builder CTA.
 - `options.eventTargetOrigin`: explicit `postMessage` target origin. The SDK defaults to the host page origin.
 - `theme.fontScale`: scale resume typography (0.9 - 1.25).
