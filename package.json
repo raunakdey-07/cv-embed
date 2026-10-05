@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build && node scripts/check-production-build.mjs && npm run check:sdk",
     "build:sdk": "node scripts/build-sdk.mjs",
     "check:sdk": "node scripts/build-sdk.mjs --check",
+    "measure": "node scripts/measure.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:unit": "vitest run",
