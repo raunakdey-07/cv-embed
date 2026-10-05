@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { TemplateRenderer } from '../../components/templates/TemplateRenderer'
 import { loadEmbedResume } from '../../lib/storage'
-import { createBuilderHandoffUrl, decodeResumeFromUrl, encodeResumeForUrl, getResumeDataFromUrl, normalizeResume } from '../../lib/utils'
+import { decodeResumeFromUrl, getResumeDataFromUrl, normalizeResume } from '../../lib/utils'
+import { resolveBuilderHandoff } from '../../lib/handoff'
 import { validateResume } from '../../schema/validators'
-import { PROTOCOL_VERSION, SDK_VERSION, isUnsupportedProtocol, parseHostCommand } from '../../../sdk/protocol'
+import { EXPORT_FORMATS, PROTOCOL_VERSION, SDK_VERSION, isUnsupportedProtocol, parseHostCommand, parseHostCommandName } from '../../../sdk/protocol'
 import type { Resume, TemplateName } from '../../types/resume'
 
 type EmbedMode = 'preview' | 'guided' | 'edit'
@@ -110,10 +111,6 @@ export function EmbedPage() {
   const lockedTemplate: TemplateName | null = lockedTemplateParam === 'minimal' || lockedTemplateParam === 'compact'
     ? lockedTemplateParam
     : null
-  const readOnlySections = useMemo(
-    () => (searchParams.get('readOnlySections') ?? '').split(',').map((value) => value.trim()).filter(Boolean),
-    [searchParams],
-  )
   const fontScale = Math.max(0.9, Math.min(1.25, Number(searchParams.get('fontScale') ?? '1') || 1))
   const radius = Math.max(4, Math.min(14, Number(searchParams.get('radius') ?? '8') || 8))
 
@@ -138,17 +135,12 @@ export function EmbedPage() {
   // is state rather than a value derived from the URL.
   const [resume, setResume] = useState<Resume | null>(initialResume)
 
-  const builderHandoffUrl = useMemo(() => {
-    if (!resume) return '/builder'
-    try {
-      return createBuilderHandoffUrl(window.location.origin, encodeResumeForUrl(resume))
-    } catch {
-      // The payload is larger than a portable link can carry. The embed itself
-      // still renders, so send the visitor to the builder rather than throwing
-      // and leaving a blank frame.
-      return '/builder'
-    }
-  }, [resume])
+  // The host's export route. Too large for a portable link means no handoff at
+  // all: sending the visitor to a bare /builder would hand them an empty editor
+  // and lose the CV they were reading, so the refusal is reported instead.
+  const handoff = useMemo(() => resolveBuilderHandoff(resume, window.location.origin), [resume])
+
+  const builderHandoffUrl = handoff.url ?? '/builder'
 
   const validation = useMemo(() => (resume ? validateResume(resume) : null), [resume])
 
@@ -289,6 +281,15 @@ export function EmbedPage() {
             message: `Host speaks protocol "${String((event.data as { version?: unknown }).version)}", this embed speaks "${PROTOCOL_VERSION}".`,
             fatal: true,
           })
+        } else if (parseHostCommandName(event.data, embedId) === 'requestExport') {
+          // A well-formed command from this host with arguments the schema
+          // refuses. Silence here would leave the host waiting for an export
+          // event that is never coming.
+          postBridgeEvent('error', {
+            code: 'command-failed',
+            message: `requestExport was rejected: format must be one of ${EXPORT_FORMATS.join(', ')}.`,
+            fatal: false,
+          })
         }
         return
       }
@@ -346,9 +347,26 @@ export function EmbedPage() {
           heading.focus({ preventScroll: true })
           return
         }
-        case 'requestExport':
-          postBridgeEvent('export', { action: 'open-builder', url: builderHandoffUrl })
+        case 'requestExport': {
+          // The embed does not render a file. It reports the route a host can
+          // send the viewer to, and echoes the requested format back so the
+          // host can match this event to the request it sent, as opposed to the
+          // reader taking the builder link on their own.
+          if (handoff.tooLarge) {
+            postBridgeEvent('error', {
+              code: 'resume-too-large',
+              message: 'requestExport was refused: this document is too large to hand off to the builder as a portable link.',
+              fatal: false,
+            })
+            return
+          }
+          postBridgeEvent('export', {
+            action: mode === 'edit' ? 'open-builder-edit' : 'open-builder',
+            url: builderHandoffUrl,
+            requestedFormat: command.payload.format,
+          })
           return
+        }
         case 'setOptions':
           setHostOptions({
             primaryColor: command.payload.primaryColor,
@@ -361,7 +379,7 @@ export function EmbedPage() {
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [builderHandoffUrl, embedId, eventOrigin, lockedTemplate, postBridgeEvent])
+  }, [builderHandoffUrl, embedId, eventOrigin, handoff.tooLarge, lockedTemplate, mode, postBridgeEvent])
 
   if (!resume) {
     return (
@@ -390,7 +408,6 @@ export function EmbedPage() {
         <section className="panel embed-debug">
           <p><strong>Embed Debug</strong> v{EMBED_VERSION}</p>
           <p>Mode: {mode} | SDK: {sdkVersion}</p>
-          <p>Read-only sections requested: {readOnlySections.length > 0 ? readOnlySections.join(', ') : 'none'} (metadata only, not enforced)</p>
           <p>Bridge: postMessage active</p>
         </section>
       ) : null}
@@ -402,7 +419,12 @@ export function EmbedPage() {
             href={builderHandoffUrl}
             target="_blank"
             rel="noreferrer"
-            onClick={() => postBridgeEvent('export', { action: mode === 'edit' ? 'open-builder-edit' : 'open-builder' })}
+            onClick={() => postBridgeEvent('export', {
+              action: mode === 'edit' ? 'open-builder-edit' : 'open-builder',
+              url: builderHandoffUrl,
+              // A reader-initiated handoff is not the answer to any request.
+              requestedFormat: null,
+            })}
           >
             {mode === 'edit' ? 'Open Editable Builder' : 'Open in Builder'}
           </a>

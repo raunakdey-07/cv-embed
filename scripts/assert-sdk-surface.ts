@@ -12,8 +12,8 @@ import { PROTOCOL_VERSION, SDK_VERSION } from '../sdk/protocol.ts'
  * Text matching is not good enough here, and not only because minification
  * renames every local: a regex can only prove the build produced the string it
  * looked for. It cannot tell a working bundle from one that kept the string
- * but broke the behaviour behind it, and the previous version of this check had
- * exactly that blind spot. It also failed on a correct minified bundle, because
+ * while losing the behaviour behind it, and the check this replaced had exactly
+ * that blind spot. It also failed on a correct minified bundle, because
  * `render: (config) =>` is not the text `render:e=>`.
  *
  * Evaluating the artifact subsumes the namespace-unwrap check too: if the
@@ -21,10 +21,10 @@ import { PROTOCOL_VERSION, SDK_VERSION } from '../sdk/protocol.ts'
  * missing, `CVEmbed` is still the namespace object, which has no `render`, and
  * the failure surfaces below.
  */
-export function assertPublicSurface(code) {
+export function assertPublicSurface(code: string): void {
   // A minimal host: enough for the bundle to evaluate, not enough to render.
   // render() is only called for its argument validation.
-  const sandbox = {
+  const sandbox: Record<string, unknown> = {
     window: {
       location: { origin: 'https://example.test', href: 'https://example.test/' },
       addEventListener() {},
@@ -33,14 +33,14 @@ export function assertPublicSurface(code) {
     document: { currentScript: null, querySelector: () => null },
     URL,
     TextEncoder,
-    btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
+    btoa,
   }
   sandbox.globalThis = sandbox
 
   const context = createContext(sandbox)
   runInContext(code, context, { timeout: 5_000 })
 
-  const api = context.CVEmbed
+  const api = context.CVEmbed as Record<string, unknown> | undefined
   if (!api || typeof api !== 'object') {
     throw new Error('public/sdk.js does not define a window.CVEmbed object.')
   }
@@ -58,7 +58,7 @@ export function assertPublicSurface(code) {
   // omits a resume must get a thrown Error, not a silent no-op.
   let threw = false
   try {
-    api.render({ target: '#missing' })
+    ;(api.render as (config: unknown) => void)({ target: '#missing' })
   } catch {
     threw = true
   }

@@ -21,21 +21,7 @@ export interface CVEmbedOptions {
   autoHeight?: boolean
   debug?: boolean
   mode?: 'preview' | 'guided' | 'edit'
-  /**
-   * Metadata only. The embedded resume is always read-only: it renders a
-   * template with no editing surface, so there is nothing for this to lock.
-   * It is reported back in the `ready` payload so a host can read what it
-   * requested. It is NOT a security control and must not be relied on to hide
-   * data from the viewer.
-   */
-  readOnlySections?: string[]
   lockedTemplate?: 'minimal' | 'compact'
-  /**
-   * Metadata only, for the same reason as readOnlySections. The embed exposes
-   * no import control, and the resume travels in the URL fragment the host
-   * itself supplied. It is NOT a security control.
-   */
-  disableImport?: boolean
   disableDownload?: boolean
   /** Origin that receives bridge events. Defaults to the host page origin. */
   eventTargetOrigin?: string
@@ -175,16 +161,8 @@ export function buildEmbedUrl(config: CVEmbedConfig, embedId?: string): string {
     url.searchParams.set('debug', '1')
   }
 
-  if (config.options?.readOnlySections && config.options.readOnlySections.length > 0) {
-    url.searchParams.set('readOnlySections', config.options.readOnlySections.join(','))
-  }
-
   if (config.options?.lockedTemplate) {
     url.searchParams.set('lockedTemplate', config.options.lockedTemplate)
-  }
-
-  if (config.options?.disableImport) {
-    url.searchParams.set('disableImport', '1')
   }
 
   url.searchParams.set('eventOrigin', config.options?.eventTargetOrigin ?? window.location.origin)

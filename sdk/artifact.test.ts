@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { assertPublicSurface } from '../scripts/assert-sdk-surface.mjs'
+import { assertPublicSurface } from '../scripts/assert-sdk-surface.ts'
 import { PROTOCOL_VERSION, SDK_VERSION } from './protocol'
 
 /**

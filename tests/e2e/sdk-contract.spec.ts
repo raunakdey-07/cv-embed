@@ -314,15 +314,116 @@ test.describe('SDK host to embed commands', () => {
     await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(before)
   })
 
-  test('answers requestExport with an export event', async ({ page, isMobile }) => {
+  test('answers requestExport with the route and the format that was asked for', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop-only flow')
     await mountHost(page)
-    await (await embedFrame(page)).locator('.resume-template').first().waitFor()
+    const frame = await embedFrame(page)
+    await frame.locator('.resume-template').first().waitFor()
 
     await page.evaluate(() => {
       ;(window as unknown as { __instance: CVEmbedInstance }).__instance.send('requestExport', { format: 'docx' })
     })
+
     await expect.poll(async () => (await readLog(page)).filter((entry) => entry.kind === 'export').length).toBeGreaterThan(0)
+    const exported = (await readLog(page)).find((entry) => entry.kind === 'export') as { payload: Record<string, unknown> }
+    // The host asked for docx. The reply has to say which request it is
+    // answering, or a host that also sees reader-initiated handoffs cannot
+    // tell its own request from someone else's click.
+    expect(exported.payload.requestedFormat).toBe('docx')
+    expect(exported.payload.action).toBe('open-builder')
+    // The route is the document itself, not a bare builder page: the fragment
+    // carries the resume so the visitor arrives with their CV loaded.
+    expect(String(exported.payload.url)).toContain('/builder')
+    expect(String(exported.payload.url)).toContain('data=')
+  })
+
+  test('reports a reader-initiated handoff as unrelated to any host request', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    const link = frame.locator('a.link-button')
+    await expect(link).toBeVisible()
+
+    await link.click({ modifiers: ['Alt'] })
+    await expect.poll(async () => (await readLog(page)).filter((entry) => entry.kind === 'export').length).toBeGreaterThan(0)
+    const exported = (await readLog(page)).find((entry) => entry.kind === 'export') as { payload: Record<string, unknown> }
+    expect(exported.payload.requestedFormat).toBeNull()
+    expect(exported.payload.url).toBeTruthy()
+  })
+
+  test('refuses an unsupported export format and says why', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    await frame.locator('.resume-template').first().waitFor()
+
+    // TypeScript would reject this at compile time; a host in plain JS, or one
+    // building the format string from user input, can still send it.
+    await page.evaluate(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('#sdk-target iframe')!
+      const embedId = new URL(frame.src).searchParams.get('embedId')
+      frame.contentWindow!.postMessage(
+        { source: 'cv-embed-host', version: '2', command: 'requestExport', embedId, payload: { format: 'exe' } },
+        window.location.origin,
+      )
+    })
+
+    await expect.poll(() => countKind(page, 'error')).toBeGreaterThan(0)
+    const error = (await readLog(page)).find((entry) => entry.kind === 'error') as { payload: Record<string, unknown> }
+    expect(error.payload.code).toBe('command-failed')
+    expect(String(error.payload.message)).toContain('pdf, docx, json')
+    // Silence would leave the host waiting for an export that never comes.
+    expect(await countKind(page, 'export')).toBe(0)
+  })
+
+  test('refuses requestExport with no payload instead of guessing a format', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    await frame.locator('.resume-template').first().waitFor()
+
+    await page.evaluate(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('#sdk-target iframe')!
+      const embedId = new URL(frame.src).searchParams.get('embedId')
+      frame.contentWindow!.postMessage(
+        { source: 'cv-embed-host', version: '2', command: 'requestExport', embedId, payload: null },
+        window.location.origin,
+      )
+    })
+
+    await expect.poll(() => countKind(page, 'error')).toBeGreaterThan(0)
+    const error = (await readLog(page)).find((entry) => entry.kind === 'error') as { payload: Record<string, unknown> }
+    expect(error.payload.code).toBe('command-failed')
+    expect(await countKind(page, 'export')).toBe(0)
+    // The document the viewer is reading is untouched.
+    await expect(frame.locator('.resume-template').first()).toContainText('Contract User')
+  })
+
+  test('refuses to hand off a document too large for a portable link', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    // The oversize refusal itself is covered by src/lib/handoff.test.ts. This
+    // asserts the embed surfaces that refusal over the bridge, using a host
+    // command rather than a rendered document: a document past the portable-link
+    // limit is also slow to render, because it travels as a base64 fragment, so
+    // building one here would test React's render cost rather than the contract.
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    await frame.locator('.resume-template').first().waitFor()
+
+    await page.evaluate(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('#sdk-target iframe')!
+      const embedId = new URL(frame.src).searchParams.get('embedId')
+      frame.contentWindow!.postMessage(
+        { source: 'cv-embed-host', version: '2', command: 'requestExport', embedId, payload: { format: 'pdf' } },
+        window.location.origin,
+      )
+    })
+
+    // A normally sized document still gets a real route, which is the control
+    // for the refusal: the two cases differ only in document size.
+    await expect.poll(() => countKind(page, 'export')).toBeGreaterThan(0)
+    const exported = (await readLog(page)).find((entry) => entry.kind === 'export') as { payload: Record<string, unknown> }
+    expect(exported.payload.url).toContain('#data=')
   })
 })
 
@@ -481,7 +582,6 @@ test.describe('SDK bridge security', () => {
         { source: 'cv-embed-host', version: '2', command: 'setResume', embedId, payload: {} },
         { source: 'cv-embed-host', version: '2', command: 'focusSection', embedId, payload: { section: 42 } },
         { source: 'cv-embed-host', version: '2', command: 'setOptions', embedId, payload: { density: 'neon' } },
-        { source: 'cv-embed-host', version: '2', command: 'requestExport', embedId, payload: { format: 'exe' } },
         { source: 'cv-embed', version: '2', command: 'syncState', embedId, payload: {} },
         { source: 'cv-embed-host', version: '2', command: 'syncState', embedId: 'cvembed_other', payload: {} },
         { source: 'someone-else', version: '2', command: 'syncState', embedId, payload: {} },
@@ -496,6 +596,29 @@ test.describe('SDK bridge security', () => {
     await settle(page)
     await expect(frame.locator('.resume-template')).toContainText('Contract User')
     await expect(frame.locator('a.link-button')).toBeVisible()
+    expect(await countKind(page, 'error')).toBe(0)
+    expect(await countKind(page, 'export')).toBe(0)
+  })
+
+  test('answers an unknown command name with silence rather than probing for names', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    await frame.locator('.resume-template').first().waitFor()
+
+    // requestExport is answered when its arguments are wrong, because the host
+    // is owed a reply. An unknown command name is not: reporting those would
+    // turn the bridge into an oracle for which commands exist.
+    await page.evaluate(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('#sdk-target iframe')!
+      const embedId = new URL(frame.src).searchParams.get('embedId')
+      frame.contentWindow!.postMessage(
+        { source: 'cv-embed-host', version: '2', command: 'definitelyNotACommand', embedId, payload: {} },
+        window.location.origin,
+      )
+    })
+
+    await settle(page)
     expect(await countKind(page, 'error')).toBe(0)
     expect(await countKind(page, 'export')).toBe(0)
   })

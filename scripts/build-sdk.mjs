@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 import { PROTOCOL_VERSION, SDK_VERSION } from '../sdk/protocol.ts'
-import { assertPublicSurface } from './assert-sdk-surface.mjs'
+import { assertPublicSurface } from './assert-sdk-surface.ts'
 
 const checkOnly = process.argv.includes('--check')
 

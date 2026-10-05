@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMBED_EVENTS,
+  EXPORT_FORMATS,
   HOST_COMMANDS,
   PROTOCOL_VERSION,
   SDK_VERSION,
   isUnsupportedProtocol,
   parseEmbedEvent,
   parseHostCommand,
+  parseHostCommandName,
 } from './protocol'
 
 const embedId = 'cvembed_test'
@@ -125,6 +127,13 @@ describe('parseHostCommand', () => {
     expect(parseHostCommand({ ...base, command: 'setResume', payload: {} }, embedId)).toBeNull()
   })
 
+  it('rejects an unsupported export format instead of defaulting it', () => {
+    // Defaulting an unknown format would hand the host a PDF it never asked
+    // for, which is the silent misreport this contract exists to prevent.
+    expect(parseHostCommand({ ...base, command: 'requestExport', payload: { format: 'exe' } }, embedId)).toBeNull()
+    expect(parseHostCommand({ ...base, command: 'requestExport', payload: { format: null } }, embedId)).toBeNull()
+  })
+
   it('rejects the wrong source', () => {
     expect(parseHostCommand({ ...base, source: 'cv-embed', command: 'syncState', payload: {} }, embedId)).toBeNull()
   })
@@ -135,6 +144,56 @@ describe('parseHostCommand', () => {
 
   it('rejects an embed-origin envelope sent to the command parser', () => {
     expect(parseHostCommand({ ...readyEvent }, embedId)).toBeNull()
+  })
+})
+
+describe('parseHostCommandName', () => {
+  const base = { source: 'cv-embed-host', version: PROTOCOL_VERSION, embedId }
+
+  it('names a command whose payload the schema refused', () => {
+    // The embed uses this to answer "your arguments were wrong" instead of
+    // leaving the host waiting for an event that will never arrive.
+    expect(parseHostCommandName({ ...base, command: 'requestExport', payload: { format: 'exe' } }, embedId)).toBe('requestExport')
+  })
+
+  it('names a well-formed command too', () => {
+    expect(parseHostCommandName({ ...base, command: 'syncState', payload: {} }, embedId)).toBe('syncState')
+  })
+
+  it('does not name anything for a message that is not ours', () => {
+    expect(parseHostCommandName({ ...base, command: 'dropDatabase', payload: {} }, embedId)).toBeNull()
+    expect(parseHostCommandName({ ...base, embedId: 'cvembed_other', command: 'syncState', payload: {} }, embedId)).toBeNull()
+    expect(parseHostCommandName({ ...base, source: 'cv-embed', command: 'syncState', payload: {} }, embedId)).toBeNull()
+    expect(parseHostCommandName({ ...base, version: '9', command: 'syncState', payload: {} }, embedId)).toBeNull()
+    expect(parseHostCommandName(null, embedId)).toBeNull()
+  })
+})
+
+describe('export payload', () => {
+  const base = { source: 'cv-embed', version: PROTOCOL_VERSION, embedId, event: 'export' }
+
+  it('carries the route and the format the host asked for', () => {
+    const parsed = parseEmbedEvent({ ...base, payload: { action: 'open-builder', url: 'https://example.test/builder', requestedFormat: 'docx' } }, embedId)
+    expect(parsed?.payload).toEqual({ action: 'open-builder', url: 'https://example.test/builder', requestedFormat: 'docx' })
+  })
+
+  it('distinguishes a reader handoff from an answer to a host request', () => {
+    // null requestedFormat means the reader took the link, not that the embed
+    // ignored a request. Without it a host cannot correlate the two.
+    const reader = parseEmbedEvent({ ...base, payload: { action: 'open-builder', url: '/builder', requestedFormat: null } }, embedId)
+    expect(reader?.payload.requestedFormat).toBeNull()
+  })
+
+  it('rejects an action it cannot route to', () => {
+    expect(parseEmbedEvent({ ...base, payload: { action: 'download-pdf' } }, embedId)).toBeNull()
+    expect(parseEmbedEvent({ ...base, payload: { action: 'open-builder', requestedFormat: 'rtf' } }, embedId)).toBeNull()
+  })
+
+  it('accepts every format the protocol advertises', () => {
+    for (const format of EXPORT_FORMATS) {
+      const parsed = parseEmbedEvent({ ...base, payload: { action: 'open-builder', requestedFormat: format } }, embedId)
+      expect(parsed?.payload.requestedFormat, format).toBe(format)
+    }
   })
 })
 

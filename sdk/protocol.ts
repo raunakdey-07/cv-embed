@@ -44,6 +44,9 @@ export const HOST_COMMANDS = [
   'setOptions',
 ] as const
 
+/** Formats the embed can route an export request to. */
+export const EXPORT_FORMATS = ['pdf', 'docx', 'json'] as const
+
 export type EmbedEventName = (typeof EMBED_EVENTS)[number]
 export type HostCommandName = (typeof HOST_COMMANDS)[number]
 
@@ -73,9 +76,20 @@ const validationChangePayload = z.object({
 
 const sectionFocusPayload = z.object({ section: z.string() })
 
+/**
+ * The embed renders and routes; it never produces a file. So this payload
+ * describes a route for the host to act on, not a delivered document, and the
+ * field names say so.
+ *
+ * `requestedFormat` is the correlation key: a host that sent `requestExport`
+ * gets its own format back, and a reader-initiated handoff reports null. That
+ * is how a host tells "my request was answered" apart from "the reader clicked
+ * the builder link" when both arrive as an `export` event.
+ */
 const exportPayload = z.object({
   action: z.enum(['open-builder', 'open-builder-edit']),
   url: z.string().optional(),
+  requestedFormat: z.enum(EXPORT_FORMATS).nullable().optional(),
 })
 
 const readyPayload = z.object({
@@ -93,7 +107,6 @@ const readyPayload = z.object({
 
 const errorPayload = z.object({
   code: z.enum([
-    'invalid-message',
     'unsupported-protocol',
     'resume-invalid',
     'resume-too-large',
@@ -121,7 +134,7 @@ export const hostCommandPayloads = {
   setResume: z.object({ resume: z.custom<unknown>((value) => value !== undefined) }),
   focusSection: z.object({ section: z.string().min(1) }),
   requestExport: z.object({
-    format: z.enum(['pdf', 'docx', 'json']).default('pdf'),
+    format: z.enum(EXPORT_FORMATS).default('pdf'),
   }),
   setOptions: z.object({
     primaryColor: z.string().nullable().optional(),
@@ -150,7 +163,7 @@ export interface HostCommandPayloadMap {
   syncState: Record<string, never>
   setResume: { resume: unknown }
   focusSection: { section: string }
-  requestExport: { format: 'pdf' | 'docx' | 'json' }
+  requestExport: { format: (typeof EXPORT_FORMATS)[number] }
   setOptions: { primaryColor?: string | null; density?: 'comfortable' | 'compact' | null; showDownload?: boolean }
 }
 
@@ -215,6 +228,23 @@ export function parseHostCommand(data: unknown, embedId: string): HostCommand | 
     embedId: envelope.data.embedId,
     payload: payload.data,
   } as HostCommand
+}
+
+/**
+ * Names the command in a message from the embedded frame's host, or returns null
+ * when the message is not a well-formed command for this embed.
+ *
+ * This exists so the embed can tell a host *why* it refused something. Parsing a
+ * command fully and discarding the result on failure cannot distinguish "unknown
+ * command" from "known command, wrong arguments", and only the second deserves
+ * an answer. An unknown command name is deliberately not reported: letting any
+ * caller probe which names exist turns the bridge into an oracle.
+ */
+export function parseHostCommandName(data: unknown, embedId: string): HostCommandName | null {
+  const envelope = hostCommandEnvelope.safeParse(data)
+  if (!envelope.success) return null
+  if (envelope.data.embedId !== embedId) return null
+  return envelope.data.command
 }
 
 /**
