@@ -2,10 +2,21 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 import { PROTOCOL_VERSION, SDK_VERSION } from '../sdk/protocol.ts'
+import { assertPublicSurface } from './assert-sdk-surface.mjs'
 
-const projectRoot = fileURLToPath(new URL('../', import.meta.url))
 const checkOnly = process.argv.includes('--check')
 
+/**
+ * Minified, because every host page downloads this file and the shipped bundle
+ * is 53% smaller over the wire than readable output (158.8 kB -> 75.3 kB raw,
+ * 28.4 kB -> 21.1 kB gzip, measured). No source map: a map would add 408 kB to
+ * the repository to serve a debugging aid for a four-member public surface, and
+ * the SDK types and protocol doc are the debugging path. Errors reach hosts
+ * through `onError` with codes rather than as throws from minified frames.
+ *
+ * `keepNames` preserves function names in stack traces, which is what keeps a
+ * minified SDK debuggable at all.
+ */
 const result = await build({
   configFile: false,
   logLevel: 'warn',
@@ -16,7 +27,10 @@ const result = await build({
       formats: ['iife'],
       fileName: () => 'sdk.js',
     },
-    minify: false,
+    minify: 'esbuild',
+    // Without this the minifier renames every internal function, so a stack
+    // trace from inside the SDK reads `a` instead of `buildEmbedUrl`.
+    esbuild: { keepNames: true },
     sourcemap: false,
     target: 'es2018',
     write: false,
@@ -36,27 +50,6 @@ if (!chunk) {
 
 const targetPath = fileURLToPath(new URL('../public/sdk.js', import.meta.url))
 const current = await readFile(targetPath, 'utf8').catch(() => '')
-
-/**
- * The global is the whole public contract, so a rename or a dropped export is a
- * breaking change for every host page. Checking it here means the build fails
- * rather than the first integrator finding out.
- */
-function assertPublicSurface(code) {
-  const required = [
-    ['render', /render:\s*\(config2?\)\s*=>/],
-    ['version', /version:\s*SDK_VERSION/],
-    ['protocolVersion', /protocolVersion:\s*PROTOCOL_VERSION/],
-  ]
-  for (const [name, pattern] of required) {
-    if (!pattern.test(code)) {
-      throw new Error(`public/sdk.js no longer exposes CVEmbed.${name}. Hosts depend on it.`)
-    }
-  }
-  if (!code.includes('CVEmbed = CVEmbed.CVEmbed;')) {
-    throw new Error('public/sdk.js does not unwrap the bundle namespace, so window.CVEmbed is not the documented object.')
-  }
-}
 
 if (checkOnly) {
   if (current !== chunk.code) {
