@@ -44,20 +44,17 @@ const current = await readFile(targetPath, 'utf8').catch(() => '')
  */
 function assertPublicSurface(code) {
   const required = [
+    ['render', /render:\s*\(config2?\)\s*=>/],
     ['version', /version:\s*SDK_VERSION/],
     ['protocolVersion', /protocolVersion:\s*PROTOCOL_VERSION/],
-    ['render', /render:\s*\(config2?\)\s*=>/],
   ]
   for (const [name, pattern] of required) {
     if (!pattern.test(code)) {
       throw new Error(`public/sdk.js no longer exposes CVEmbed.${name}. Hosts depend on it.`)
     }
   }
-  if (!code.includes(`CVEmbed = CVEmbed.CVEmbed;`)) {
+  if (!code.includes('CVEmbed = CVEmbed.CVEmbed;')) {
     throw new Error('public/sdk.js does not unwrap the bundle namespace, so window.CVEmbed is not the documented object.')
-  }
-  if (!code.includes(`protocolVersion: PROTOCOL_VERSION`) && !code.includes('protocolVersion')) {
-    throw new Error('public/sdk.js is missing protocolVersion.')
   }
 }
 

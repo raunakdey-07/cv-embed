@@ -167,7 +167,6 @@ const results = {}
     const started = performance.now()
     const heights = []
 
-    const root = document.getElementById('root')
     const instance = window.CVEmbed.render({
       target: '#sdk-target',
       baseUrl: location.origin,
@@ -190,7 +189,6 @@ const results = {}
     out['embed first height message'] = heights[0]?.at ?? 0
     out['embed height messages (count)'] = heights.length
     out['embed instance ready flag'] = instance.isReady()
-    void root
     return out
   }, LARGE_RESUME)
 

@@ -6,6 +6,7 @@ import {
   parseEmbedEvent,
   type EmbedEventName,
   type HostCommandName,
+  type HostCommandPayloadMap,
 } from './protocol'
 
 export interface CVEmbedTheme {
@@ -79,13 +80,8 @@ export interface CVEmbedBridgeEvent {
 }
 
 export type CVEmbedHostCommand = HostCommandName
-export type CVEmbedHostCommandPayloads = {
-  syncState: Record<string, never>
-  setResume: { resume: unknown }
-  focusSection: { section: string }
-  requestExport: { format: 'pdf' | 'docx' | 'json' }
-  setOptions: { primaryColor?: string | null; density?: 'comfortable' | 'compact' | null; showDownload?: boolean }
-}
+/** Re-exported rather than restated, so the SDK and the schemas cannot disagree. */
+export type CVEmbedHostCommandPayloads = HostCommandPayloadMap
 
 export interface CVEmbedInstance {
   destroy: () => void
