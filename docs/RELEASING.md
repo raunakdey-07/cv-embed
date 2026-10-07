@@ -34,8 +34,11 @@ Two independent versions, both defined in `sdk/protocol.ts`:
 | `SDK_VERSION` | the SDK package | any SDK release, breaking or not. Semver. |
 | `PROTOCOL_VERSION` | the wire format | any breaking change to a message contract |
 
-`package.json` is versioned with `SDK_VERSION`. Keep them in step when you
-release: they describe the same artifact from two angles.
+`SDK_VERSION` is the only one of the two that ships: `CVEmbed.version` reads it
+and `npm run check:sdk` fails the build if the built artifact reports anything
+else. The `version` in `package.json` is not part of that contract, because the
+package is `private` and is never published. Bump `SDK_VERSION` when you want
+the artifact to declare a new release.
 
 ### What is a breaking protocol change
 
@@ -82,12 +85,19 @@ reason to carry.
 ## Artifact: `public/sdk.js`
 
 Checked into the repository and built from `sdk/index.ts`, so it is regenerated
-rather than edited. It is built unminified on purpose: a host debugging a
-message problem can read it. It costs about 28 kB gzipped, most of which is
-Zod, which validates every message at the boundary.
+rather than edited. `npm run build` runs `scripts/build-sdk.mjs --check`, which
+fails when the committed file differs from a fresh build.
 
-If you ever minify it, measure the host's first paint before and after rather
-than assuming smaller is better.
+It is minified, with `keepNames` so stack traces still name their functions and
+no source map. That was a measured change, not an assumption: 158.78 kB to
+75.01 kB raw, 28.45 kB to 20.82 kB gzip, about 7.6 kB gzip saved on every host
+page that embeds. The source map would add roughly 400 kB to the repository to
+serve a debugging aid for a four-member public surface, and the SDK types and
+`docs/SDK_PROTOCOL.md` are the debugging path. Errors reach hosts through
+`onError` codes rather than as throws from inside a minified frame.
+
+If you revisit any of that, re-run `npm run measure` before and after and put
+the numbers in `docs/PERFORMANCE.md`, as with any other performance decision.
 
 ## Release checklist
 
@@ -97,5 +107,7 @@ than assuming smaller is better.
       `docs/PERFORMANCE.md` if they moved
 - [ ] `public/sdk.js` regenerated and committed
 - [ ] `docs/SDK_PROTOCOL.md` matches the schemas
-- [ ] `docs/CV_EMBED_AUDIT_RESULTS.md` updated if behaviour changed
 - [ ] `PROTOCOL_VERSION` bumped if, and only if, the wire format changed
+
+There is no tagged release in this repository yet, so treat the checklist above
+as the definition of one rather than as a record of past ones.
