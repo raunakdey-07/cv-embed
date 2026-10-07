@@ -213,6 +213,18 @@ On every inbound command, in [`src/app/embed/EmbedPage.tsx`](../src/app/embed/Em
 7. the payload parses against that command's schema
 8. `setResume` additionally has to look like a resume before it replaces one
 
+On the frame itself:
+
+- `title` is set from `config.title`, so the frame is named rather than announced
+  as an unlabelled iframe
+- `referrerPolicy` is `strict-origin-when-cross-origin`, which keeps a host's full
+  embed URL out of the frame's `Referer`
+- `loading` is `lazy`, so an embed below the fold costs nothing to place
+- the frame is granted **no** Permissions Policy features. The embed renders a
+  read-only template and never touches the clipboard, so an earlier
+  `allow="clipboard-write"` granted a cross-origin frame a capability nothing
+  used. A feature is added at the same time as the call that needs it.
+
 What this does **not** give you:
 
 - The embed does not authenticate the host. Any page that embeds the frame is

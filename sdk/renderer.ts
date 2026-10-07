@@ -216,7 +216,11 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   iframe.setAttribute('title', config.title ?? 'Embedded CV-Embed Resume')
   // Keeps the full URL out of the frame's Referer on cross-origin embeds.
   iframe.referrerPolicy = 'strict-origin-when-cross-origin'
-  iframe.setAttribute('allow', 'clipboard-write')
+  // No Permissions Policy here on purpose. The embed renders a read-only
+  // template with no editing surface and never touches the clipboard, so
+  // `allow="clipboard-write"` granted a cross-origin frame a capability nothing
+  // used. The frame gets no feature permissions; add one at the same time as the
+  // call that needs it.
 
   const appliedHeight = () => Math.max(0, Math.min(MAX_IFRAME_HEIGHT, Math.round(Number(iframe.height) || 0)))
 
