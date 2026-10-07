@@ -60,7 +60,7 @@ for exactly what is enforced, including the limits.
 - **Validation & Scoring**: Visibility-aware error and warning checks with a resume quality score indicator.
 - **Draft Persistence**: Saves progress in guarded local browser storage so your data survives refreshes and tab changes.
 - **Portable Data**: Import/export normalized resume JSON for backup and migration. Portable links keep resume data in the URL fragment, where the browser does not send it in the HTTP request. Anyone with the link can still read the CV.
-- **Performance**: PDF engine (~1.5 MB) loads only when export or embed tools request it.
+- **Performance**: The PDF engine (1.58 MB) loads only when export or embed tools request it.
 
 ## Tech Stack
 
@@ -92,15 +92,24 @@ for exactly what is enforced, including the limits.
 ## Available Scripts
 
 ```bash
-npm run dev      # Start dev server
-npm run lint     # Run ESLint
-npm run build    # Type-check + production build
-npm run preview  # Preview production build locally
-npm run test:unit # Run unit tests
-npm run test:e2e  # Run Playwright desktop/mobile interaction tests
-npm run test      # Run unit + e2e suite
+npm run dev        # Start dev server
+npm run lint       # Run ESLint
+npm run build      # Type-check, production build, and artifact checks
+npm run build:sdk  # Regenerate public/sdk.js from sdk/
+npm run check:sdk  # Fail if public/sdk.js is stale or lost its public surface
+npm run preview    # Preview production build locally
+npm run test:unit  # Run unit tests
+npm run test:e2e   # Run Playwright desktop/mobile interaction tests
+npm run test       # Run unit + e2e suite
+npm run measure    # Measure latency against a running preview
 npm run bench:server # Run local Chromium benchmark server
 ```
+
+`npm run build` is a gate, not just a bundler step. After `vite build` it fails
+if the production entry imports the PDF renderer eagerly, or if the committed
+`public/sdk.js` no longer matches a fresh build of `sdk/` or has lost its
+`render`, `version`, or `protocolVersion` exports. See
+[`docs/RELEASING.md`](docs/RELEASING.md).
 
 ## Routes
 
@@ -220,11 +229,31 @@ All options live in the Format panel (and section visibility/order also in the n
 
 ```bash
 npm run test:unit   # Vitest unit tests
-npm run test:e2e    # Playwright tests across desktop-chromium and mobile-chromium
+npm run test:e2e    # Playwright across desktop-chromium, mobile-chromium, and firefox
 npm run test        # Both suites
 ```
 
-E2E coverage includes builder QoL flows, mobile view and import behavior, focus visibility, narrow-viewport reflow, production-safe embed payloads, SDK execution and lifecycle, PDF engine lazy loading per device class, and export menu behavior. CI runs lint, build, unit, and e2e on every push to `main` and on pull requests (`.github/workflows/ci.yml`).
+E2E runs in three Playwright projects: `desktop-chromium`, `mobile-chromium`,
+and `firefox`. The Firefox project runs the cross-cutting suite, the specs
+covering the behaviours that differ between rendering engines, which is where
+the two engines have actually diverged. No test is excluded from Firefox to
+make it pass, and no browser-specific branch exists in the application.
+
+Coverage includes builder QoL flows, mobile view and import behavior, focus
+visibility, narrow-viewport reflow, production-safe embed payloads, SDK
+execution and lifecycle, the full bridge contract including its rejection
+paths, PDF engine lazy loading per device class, and export menu behavior. CI
+runs lint, build, unit, and e2e on every push to `main` and on pull requests
+(`.github/workflows/ci.yml`).
+
+`tests/e2e/sdk-contract.spec.ts` is the one to read for the bridge: it drives
+the committed `public/sdk.js` against the real embed route, so the artifact and
+the protocol under test are the same bytes a host downloads. It covers the
+handshake, every host command, every event, and what happens when a message
+arrives from the wrong window, the wrong origin, the wrong `embedId`, the
+wrong source, an unknown name, a bad payload, or a foreign protocol version.
+`tests/e2e/example-host.spec.ts` runs the published example end to end, so the
+documentation cannot drift from working code.
 
 Manual checklists live in `docs/ux-qa-matrix.md`.
 
@@ -232,6 +261,23 @@ Manual checklists live in `docs/ux-qa-matrix.md`.
 
 - Use `docs/ux-qa-matrix.md` to verify the 12 high-impact QoL upgrades on desktop and mobile.
 - It includes step-by-step scenarios, expected behavior, and a reusable QA log template.
+
+## Performance
+
+Numbers, not adjectives. [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) records
+the measured baseline: bundle sizes, first-paint and keystroke latency, PDF and
+DOCX export cost, and bridge message volume. Reproduce it with:
+
+```bash
+npm run build
+npm run preview -- --port 4173 &
+npm run measure -- http://localhost:4173
+```
+
+The one structural rule worth knowing: the ~1.6 MB PDF engine is never fetched
+until someone asks for a PDF, and the build fails if the production entry
+imports it eagerly (`scripts/check-production-build.mjs`). A blank first visit
+requests it zero times.
 
 ## PDF Benchmarking
 
@@ -243,9 +289,9 @@ Manual checklists live in `docs/ux-qa-matrix.md`.
 ```text
 cv-embed/
 ├── .github/workflows/      # CI (lint, build, unit, e2e)
-├── docs/                   # QA matrix + PDF benchmark guide
-├── public/                 # sdk.js, playground, headers/redirects
-├── scripts/                # Chromium benchmark server
+├── docs/                   # Protocol contract, perf baseline, release and QA guides
+├── public/                 # sdk.js, host example, playground, headers/redirects
+├── scripts/                # SDK build + artifact gates, measurement, benchmarks
 ├── sdk/                    # SDK TypeScript source
 ├── src/
 │   ├── app/                # Builder + embed pages
