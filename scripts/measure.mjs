@@ -179,14 +179,18 @@ const results = {}
     })
 
     await new Promise((resolve) => {
+      // ready and heightChange are independent postMessages with no ordering
+      // guarantee, so waiting on ready alone reads an empty height list most of
+      // the time and reports 0 ms for a metric that was never observed. Wait for
+      // both, which is the same fix the SDK auto-height E2E check uses.
       const check = () => {
-        if (readyAt > 0 || performance.now() - started > 20000) return resolve()
+        if ((readyAt > 0 && heights.length > 0) || performance.now() - started > 20000) return resolve()
         setTimeout(check, 10)
       }
       check()
     })
     out['embed init to ready'] = readyAt
-    out['embed first height message'] = heights[0]?.at ?? 0
+    out['embed first height message'] = heights[0]?.at ?? 'not observed'
     out['embed height messages (count)'] = heights.length
     out['embed instance ready flag'] = instance.isReady()
     return out
