@@ -4,6 +4,14 @@ Audit: `docs/CV_EMBED_AUDIT.md`
 Baseline commit: `c2d3ca4`
 Implementation date: 2026-09-24
 
+> **Historical record, appended chronologically.** This file is the log of what
+> was fixed after the 2026-09-24 audit, in the order it was done. Sections are
+> dated because earlier ones are superseded by later ones: the "Remaining Risks"
+> and "Final Gate Record" sections near the top still say 79 unit tests, 81 E2E
+> tests, and Chromium-only CI, and the cross-browser pass further down replaced
+> all three. Read the last dated section for the current state. Nothing here is
+> a release gate; the checklist in `RELEASING.md` is.
+
 ## Verification Summary
 
 | Check | Before | After |

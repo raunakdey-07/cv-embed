@@ -2,6 +2,15 @@
 
 Audit date: 2026-09-24
 
+> **Historical record.** This is the audit as written on 2026-09-24, against
+> commit `c2d3ca4` and the deployment live at the time. It is kept because it is
+> the source of the remediation work, not because it describes the current
+> repository. Findings here have since been fixed, rejected, or deliberately
+> deferred; see `CV_EMBED_AUDIT_RESULTS.md` for what happened to each. Test
+> counts, browser coverage, and dependency numbers in this file are the
+> September snapshot and do not match today. For the current state, read
+> `SDK_PROTOCOL.md`, `PERFORMANCE.md`, and `RELEASING.md`.
+
 This report covers the local repository at commit `c2d3ca4` and the deployed application at `https://cv-embed.vercel.app/`. The local build and live deployment served the same current application and SDK hashes during the audit.
 
 ## Executive Summary
