@@ -124,6 +124,23 @@ function mergeEvents(left?: CVEmbedEvents, right?: CVEmbedEvents): CVEmbedEvents
   return { ...(left ?? {}), ...(right ?? {}) }
 }
 
+/**
+ * Forces the frame to load a fresh document.
+ *
+ * Resume data travels in the URL fragment, so replacing a document produces a
+ * new URL that differs from the old one only after the `#`. Navigating an
+ * iframe to a URL that differs solely in its fragment is a same-document
+ * navigation: the browser keeps the existing document and only scrolls, so the
+ * frame never reloads, no second handshake arrives, and `isReady()` stays false
+ * for the rest of the instance's life. A cache-busting query parameter makes
+ * the difference a real one.
+ */
+function withReloadNonce(url: string, count: number): string {
+  const next = new URL(url)
+  next.searchParams.set('_cv', String(count))
+  return next.toString()
+}
+
 const activeInstances = new WeakMap<HTMLElement, CVEmbedInstance>()
 
 export function buildEmbedUrl(config: CVEmbedConfig, embedId?: string): string {
@@ -207,6 +224,8 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
   // Derived from a configuration that already built successfully, so the
   // message handler can never throw on a value the host supplied.
   let expectedOrigin = new URL(initialUrl).origin
+  let currentUrl = initialUrl
+  let reloadCount = 0
   iframe.src = initialUrl
   iframe.width = String(config.width ?? '100%')
   iframe.height = String(config.height ?? 1100)
@@ -324,10 +343,13 @@ export function renderEmbed(config: CVEmbedConfig): CVEmbedInstance {
     activeConfig = merged
     expectedOrigin = new URL(nextUrl).origin
     listeners = mergeEvents(listeners, nextConfig.events)
-    // A reload creates a new document that has not handshaken yet.
-    if (iframe.src !== nextUrl) {
+    // Compared against the URL this instance was last pointed at, not
+    // `iframe.src`, which carries the reload nonce added below.
+    if (currentUrl !== nextUrl) {
+      // A reload creates a new document that has not handshaken yet.
       ready = false
-      iframe.src = nextUrl
+      currentUrl = nextUrl
+      iframe.src = withReloadNonce(nextUrl, ++reloadCount)
     }
 
     if (typeof nextConfig.title !== 'undefined') {
