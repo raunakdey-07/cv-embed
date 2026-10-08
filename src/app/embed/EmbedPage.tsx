@@ -368,10 +368,16 @@ export function EmbedPage() {
           return
         }
         case 'setOptions':
-          setHostOptions({
-            primaryColor: command.payload.primaryColor,
-            density: command.payload.density,
-            showDownload: command.payload.showDownload,
+          // A partial payload updates only the options it names. Replacing the
+          // whole object would make an absent field indistinguishable from an
+          // explicit null, so `{ showDownload: false }` would quietly undo a
+          // primaryColor set a moment earlier.
+          setHostOptions((previous) => {
+            const next = { ...previous }
+            if (command.payload.primaryColor !== undefined) next.primaryColor = command.payload.primaryColor
+            if (command.payload.density !== undefined) next.density = command.payload.density
+            if (command.payload.showDownload !== undefined) next.showDownload = command.payload.showDownload
+            return next
           })
           return
       }
