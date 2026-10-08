@@ -134,6 +134,71 @@ test('reduced motion uses non-animated section scrolling', async ({ page, isMobi
   await expect.poll(async () => page.evaluate(() => (window as unknown as { __cvScrollBehaviors?: string[] }).__cvScrollBehaviors ?? [])).toContain('auto')
 })
 
+test('readiness explanations are described by their trigger, not hidden while visible', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+  // These panels are revealed on hover and on focus as well as on click, so
+  // marking them aria-hidden until the click state changed made content that
+  // was on screen for sighted keyboard users unreadable to assistive tech.
+  // The Clean variant renders in place of the issue pill, not alongside it, so
+  // this reads whichever pair is on screen.
+  const explanations = await page.evaluate(() => {
+    const pairs: [string, string][] = [
+      ['.completion-info-btn', '#readiness-details'],
+      ['.score-pill', '#scoring-rubric'],
+      ['.completion-pill-action', '#fix-next-details'],
+      ['.completion-pill.ok', '#clean-details'],
+    ]
+    return pairs.map(([trigger, panel]) => {
+      const button = document.querySelector(trigger)
+      const target = document.querySelector(panel)
+      return {
+        trigger,
+        rendered: button !== null && target !== null,
+        describedBy: button?.getAttribute('aria-describedby') ?? null,
+        describesTarget: document.getElementById(button?.getAttribute('aria-describedby') ?? '') !== null,
+        panelHidden: target?.getAttribute('aria-hidden') ?? null,
+        panelRole: target?.getAttribute('role') ?? null,
+        panelText: (target?.textContent ?? '').trim().length,
+      }
+    }).filter((item) => item.rendered)
+  })
+
+  expect(explanations.length, 'the two unconditional panels rendered').toBeGreaterThanOrEqual(2)
+  for (const item of explanations) {
+    // aria-describedby takes element ids, not selectors.
+    expect(item.describedBy, `${item.trigger} describes its panel`).toMatch(/^[\w-]+$/)
+    expect(item.describesTarget, `${item.trigger} points at an element that exists`).toBe(true)
+    expect(item.panelHidden, `${item.trigger} panel is not aria-hidden`).toBeNull()
+    expect(item.panelRole, `${item.trigger} panel is not a transient tooltip`).toBeNull()
+    expect(item.panelText, `${item.trigger} panel has content`).toBeGreaterThan(0)
+  }
+
+  // The error and warning counts are part of what the pill means, so they have
+  // to be in its accessible name rather than hidden behind an aria-label that
+  // replaced the visible text.
+  const label = await page.locator('.completion-pill-action').first().getAttribute('aria-label')
+  expect(label).toMatch(/\d+E \/ \d+W/)
+})
+
+test('the save indicator announces state changes, not a ticking clock', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop-only flow')
+  await page.goto('/builder')
+  await expect(page.getByText('Resume Readiness')).toBeVisible()
+
+  // The relative timestamp is refreshed on a 15s interval. In a live region it
+  // re-announced "Saved 4m ago" forever and buried the transitions that carry
+  // meaning, so only the state word is announced now.
+  const region = page.locator('.save-indicator [role="status"]')
+  await expect(region).toHaveText(/Draft saved|Saving draft|Draft not saved/)
+  await expect(region).not.toContainText('ago')
+
+  const timestamp = page.locator('.save-indicator [aria-hidden="true"]')
+  await expect(timestamp).toContainText(/Saved|Saving/)
+})
+
 test('the skip link resolves on both routes', async ({ page }) => {
   await page.goto('/builder')
   await expect(page.locator('.skip-link')).toHaveAttribute('href', '#main-content')

@@ -1548,6 +1548,9 @@ h4.skill-cat-title { margin: 0 0 6px; }
 }
 
 .save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: 'Azeret Mono', monospace;
   font-size: 10px;
   font-weight: 600;
@@ -1555,6 +1558,22 @@ h4.skill-cat-title { margin: 0 0 6px; }
   border-radius: 999px;
   padding: 2px 8px;
   white-space: nowrap;
+}
+
+/* The visible timestamp sits next to the announced state word. Collapsed so
+   the pill reads as one label for sighted users, with the state word as the
+   accessible text. */
+.save-state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .save-indicator.saved {

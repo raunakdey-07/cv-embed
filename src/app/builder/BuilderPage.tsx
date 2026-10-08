@@ -993,12 +993,16 @@ export function BuilderPage() {
                     <button
                       type="button"
                       className="completion-info-btn"
-                      aria-label="Readiness details"
-                      aria-controls="readiness-details"
+                      aria-label="Resume Readiness details"
+                      aria-describedby="readiness-details"
                       aria-expanded={openPopover === 'info'}
                       onClick={() => setOpenPopover((p) => (p === 'info' ? null : 'info'))}
                     >i</button>
-                    <span id="readiness-details" className="completion-pill-popover completion-info-popover" role="tooltip" aria-hidden={openPopover !== 'info'}>
+                    {/* Revealed on hover and on focus as well as on click, so it
+                        is described by its trigger rather than hidden while
+                        visible. These are static explanations, not transient
+                        tooltips, so they stay in the accessibility tree. */}
+                    <span id="readiness-details" className="completion-pill-popover completion-info-popover">
                       {completion.done}/{completion.total} sections complete • Essentials {completion.essentialsDone}/{completion.essentialsTotal}
                     </span>
                   </span>
@@ -1014,8 +1018,8 @@ export function BuilderPage() {
                     type="button"
                     className={`completion-pill completion-pill-action completion-pill-compact ${issueSummary.severity === 'errors' ? 'error' : 'warn'}`}
                     title="Jump to first essentials gap or issue (Ctrl/Cmd+Shift+J)"
-                    aria-label="Fix next issue"
-                    aria-controls="fix-next-details"
+                    aria-label={`Fix next issue: ${issueSummary.label}`}
+                    aria-describedby="fix-next-details"
                     aria-expanded={openPopover === 'fixNext'}
                     onClick={() => {
                       if (openPopover === 'fixNext') {
@@ -1028,7 +1032,7 @@ export function BuilderPage() {
                   >
                     <IconAlertTriangle size={10} /> {issueSummary.label}
                   </button>
-                  <div id="fix-next-details" className="completion-pill-popover" role="tooltip" aria-hidden={openPopover !== 'fixNext'}>
+                  <div id="fix-next-details" className="completion-pill-popover">
                     {fixNextTooltipText}
                   </div>
                 </div>
@@ -1039,14 +1043,14 @@ export function BuilderPage() {
                   <button
                     type="button"
                     className="completion-pill completion-pill-compact ok"
-                    aria-label="No validation issues"
-                    aria-controls="clean-details"
+                    aria-label="Clean, no validation issues"
+                    aria-describedby="clean-details"
                     aria-expanded={openPopover === 'clean'}
                     onClick={() => setOpenPopover((p) => (p === 'clean' ? null : 'clean'))}
                   >
                     <IconCheck size={10} /> Clean
                   </button>
-                  <div id="clean-details" className="completion-pill-popover" role="tooltip" aria-hidden={openPopover !== 'clean'}>
+                  <div id="clean-details" className="completion-pill-popover">
                     No validation issues right now. Review the exported PDF before sending it.
                   </div>
                 </div>
@@ -1227,8 +1231,15 @@ export function BuilderPage() {
                 {pageIndicator.text}
               </span>
             ) : null}
-            <span className={`save-indicator ${saveState}`} title="Draft status" role="status" aria-live="polite">
-              {saveStatusText}
+            {/* The relative time ticks every 15 seconds, so putting the whole string in a
+                live region re-announced "Saved 4m ago" indefinitely and buried
+                the state changes that matter. The live region carries the state
+                transition only; the timestamp is for sight. */}
+            <span className={`save-indicator ${saveState}`} title="Draft status">
+              <span role="status" aria-live="polite" className="save-state">
+                {saveState === 'saving' ? 'Saving draft' : saveState === 'error' ? 'Draft not saved' : 'Draft saved'}
+              </span>
+              <span aria-hidden="true">{saveStatusText}</span>
             </span>
           </div>
           <div className="preview-head-actions">
@@ -1255,13 +1266,13 @@ export function BuilderPage() {
                   className="score-pill"
                   title={qualityScoreLabel}
                   aria-label={qualityScoreLabel}
-                  aria-controls="scoring-rubric"
+                  aria-describedby="scoring-rubric"
                   aria-expanded={openPopover === 'score'}
                   onClick={() => setOpenPopover((p) => (p === 'score' ? null : 'score'))}
                 >
                   {qualityScoreLabel}
                 </button>
-                <div id="scoring-rubric" className="score-help-popover" role="group" aria-label="Scoring rubric" aria-hidden={openPopover !== 'score'}>
+                <div id="scoring-rubric" className="score-help-popover">
                   <p className="score-help-title">Scoring Rubric</p>
                   <ul>
                     <li><strong>Quality:</strong> starts at 100 and deducts for errors and warnings</li>
