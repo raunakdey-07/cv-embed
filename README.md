@@ -38,8 +38,12 @@ sends commands, and reacts to errors.
   [`docs/SDK_PROTOCOL.md`](docs/SDK_PROTOCOL.md).
 - Interactive playground for debugging: `/sdk-playground.html`.
 
-The iframe is a real cross-origin boundary. Messages are checked by window,
-origin, embed id, protocol version, and payload schema on both sides. See
+The bridge validates by window, origin, embed id, protocol version, and payload
+schema on both sides. `embedId` defaults to `standalone` when a frame is
+embedded by hand rather than through the SDK, so a page embedding the URL
+directly with a plain `<iframe>` can send any valid command and receive every
+event, including `requestExport`, which returns the document. Anything you do
+not want a page to read, do not put in a link. See
 [What the bridge actually checks](docs/SDK_PROTOCOL.md#what-the-bridge-actually-checks)
 for exactly what is enforced, including the limits.
 
@@ -116,7 +120,7 @@ if the production entry imports the PDF renderer eagerly, or if the committed
 - `/` — Main resume builder
 - `/builder` — Builder alias for shared links
 - `/embed/:resumeId` — Embedded resume view
-- `/embed/portable?data=...` or `#data=...` — Portable embed payload. New links keep data in the fragment; legacy query links remain supported.
+- `/embed/portable?data=...` or `#data=...` — Portable embed payload. New links keep data in the fragment, which the browser never sends in the request. The query form still works for older links and puts the CV in the request line, so it lands in server and proxy logs; prefer the fragment.
 
 ## Embed Example (SDK v2)
 
@@ -153,7 +157,10 @@ const embed = CVEmbed.render({
 
 // Lifecycle
 embed.isReady();                                   // has the frame handshaken?
-embed.update({ resumeData: next });                // transactional: a bad value throws and changes nothing
+// Replacing the document reloads the frame, so isReady() goes false until the
+// new document handshakes. Transactional: a bad value throws and changes
+// nothing. An update that resolves to the same URL does not reload.
+embed.update({ resumeData: next });
 embed.send('focusSection', { section: 'Projects' });
 embed.on('onError', ({ code, message }) => {});    // register later
 embed.off('onError');
@@ -168,7 +175,7 @@ embed.destroy();
 - `options.debug`: render integration diagnostics inside embed.
 - `options.lockedTemplate`: lock render template to `minimal` or `compact`.
 - `options.disableDownload`: force hide builder CTA.
-- `options.eventTargetOrigin`: explicit `postMessage` target origin. The SDK defaults to the host page origin.
+- `options.eventTargetOrigin`: explicit `postMessage` target origin. The SDK defaults to the host page origin. Setting it to an origin other than the host page's makes the browser drop every event, so the bridge goes quiet with no error.
 - `theme.fontScale`: scale resume typography (0.9 - 1.25).
 - `theme.radius`: host border radius token (4 - 14).
 
@@ -249,9 +256,10 @@ runs lint, build, unit, and e2e on every push to `main` and on pull requests
 `tests/e2e/sdk-contract.spec.ts` is the one to read for the bridge: it drives
 the committed `public/sdk.js` against the real embed route, so the artifact and
 the protocol under test are the same bytes a host downloads. It covers the
-handshake, every host command, every event, and what happens when a message
-arrives from the wrong window, the wrong origin, the wrong `embedId`, the
-wrong source, an unknown name, a bad payload, or a foreign protocol version.
+handshake, every host command, every event, document replacement through both
+`setResume` and `update`, and what happens when a message arrives from the wrong
+window, the wrong origin, the wrong `embedId`, the wrong source, an unknown
+name, a bad payload, or a foreign protocol version.
 `tests/e2e/example-host.spec.ts` runs the published example end to end, so the
 documentation cannot drift from working code.
 

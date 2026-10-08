@@ -64,7 +64,8 @@ browser and delivered when it does; the embed tolerates them either way.
 
 ### `syncState`
 
-Re-emits `ready` and `validationChange`.
+Re-emits `ready` and `validationChange`. Both are needed: `ready` carries the
+scores, and `issues` arrives only with `validationChange`.
 
 - payload: `{}`
 - repeatable: yes
@@ -122,6 +123,12 @@ renders and routes; it never generates a file itself.
 Overrides configuration that otherwise comes from the iframe URL.
 
 - payload, all optional: `primaryColor: string | null`, `density: 'comfortable' | 'compact' | null`, `showDownload: boolean`
+- a partial payload changes only the options it names. An omitted field keeps
+  whatever was set before, so `{ showDownload: false }` does not undo a
+  `primaryColor` from an earlier call
+- `primaryColor` must be a six-digit hex colour. Anything else is ignored and
+  the document's own accent is used, so a bad value cannot paint the headings
+  and links in a colour that makes them unreadable against the paper
 - repeatable: yes
 - `null` clears an override and falls back to the URL configuration
 
@@ -205,7 +212,10 @@ On every inbound event, in [`sdk/renderer.ts`](../sdk/renderer.ts):
 On every inbound command, in [`src/app/embed/EmbedPage.tsx`](../src/app/embed/EmbedPage.tsx):
 
 1. `event.source` is `window.parent`
-2. `event.origin` equals the configured parent origin
+2. `event.origin` equals the configured parent origin, unless that origin is the
+   literal `*`. `event.source` still holds in that case: a window that is not
+   `window.parent` cannot produce a message whose source is `window.parent`, so
+   `*` widens nothing
 3. `source` is `cv-embed-host`
 4. `version` equals `PROTOCOL_VERSION`
 5. `embedId` matches this frame
@@ -229,6 +239,14 @@ What this does **not** give you:
 
 - The embed does not authenticate the host. Any page that embeds the frame is
   the host, and can send any valid command. There is no shared secret.
+- The SDK is not required to talk to the bridge. `embedId` defaults to
+  `standalone` when it is absent from the URL, so a page that embeds
+  `/embed/portable` with a plain `<iframe>` and no SDK is a fully working host:
+  it can send every command and receives every event. That includes
+  `requestExport`, whose reply carries the whole document. Any third-party
+  script on such a page can read those messages too. If you need the embed to
+  refuse a page that did not use the SDK, that requires a per-load secret in
+  the URL, which this protocol does not have.
 - The embedded view is read-only. It renders a template with no editing surface,
   so there is no per-section access control to configure, and no import control
   to disable. Earlier versions accepted `readOnlySections` and `disableImport`
@@ -253,3 +271,7 @@ documentation cannot drift from working code.
 `sdk/protocol.test.ts` covers the schemas directly, including every rejection
 the contract promises. `sdk/artifact.test.ts` proves the build's own artifact
 check rejects each way the bundle can silently lose its public surface.
+
+Not covered by a test: a message with a correct shape and a foreign `origin`.
+A browser cannot produce one from a single page, so the check is asserted by
+reading the code rather than by a test.
