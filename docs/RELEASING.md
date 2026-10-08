@@ -90,7 +90,7 @@ fails when the committed file differs from a fresh build.
 
 It is minified, with `keepNames` so stack traces still name their functions and
 no source map. That was a measured change, not an assumption: 158.78 kB to
-75.01 kB raw, 28.45 kB to 20.82 kB gzip, about 7.6 kB gzip saved on every host
+73.37 kB raw, 28.45 kB to 20.40 kB gzip, about 8 kB gzip saved on every host
 page that embeds. The source map would add roughly 400 kB to the repository to
 serve a debugging aid for a four-member public surface, and the SDK types and
 `docs/SDK_PROTOCOL.md` are the debugging path. Errors reach hosts through
