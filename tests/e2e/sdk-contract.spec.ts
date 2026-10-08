@@ -300,18 +300,61 @@ test.describe('SDK host to embed commands', () => {
     await expect(frame.locator('a.link-button')).toHaveCount(0)
   })
 
-  test('answers syncState with a fresh handshake', async ({ page, isMobile }) => {
+  test('setOptions changes only the options its payload names', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    await expect(frame.locator('.resume-template').first()).toBeVisible()
+
+    const readAccent = () => frame.locator('.resume-template').first().evaluate((node) =>
+      getComputedStyle(node).getPropertyValue('--primary').trim())
+
+    await page.evaluate(() => {
+      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.send('setOptions', { primaryColor: '#ff0000' })
+    })
+    await expect.poll(readAccent).toBe('#ff0000')
+
+    // An unrelated option must not undo the colour. `null` is how a host clears
+    // an override; an absent field means "leave this alone", so a payload naming
+    // only showDownload has to keep the accent the host set a moment earlier.
+    await page.evaluate(() => {
+      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.send('setOptions', { showDownload: false })
+    })
+    await expect(frame.locator('a.link-button')).toHaveCount(0)
+    await expect.poll(readAccent).toBe('#ff0000')
+
+    // A density-only payload keeps the colour too.
+    await page.evaluate(() => {
+      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.send('setOptions', { density: 'compact' })
+    })
+    await expect(frame.locator('.resume-template.density-compact').first()).toBeVisible()
+    await expect.poll(readAccent).toBe('#ff0000')
+
+    // null still clears, falling back to the document's own accent.
+    await page.evaluate(() => {
+      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.send('setOptions', { primaryColor: null })
+    })
+    await expect.poll(readAccent).not.toBe('#ff0000')
+  })
+
+  test('answers syncState with a fresh handshake and validation state', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop-only flow')
     await mountHost(page)
     await (await embedFrame(page)).locator('.resume-template').first().waitFor()
     await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(0)
+    await expect.poll(() => countKind(page, 'validation')).toBeGreaterThan(0)
     await settle(page)
-    const before = await countKind(page, 'ready')
+    const beforeReady = await countKind(page, 'ready')
+    const beforeValidation = await countKind(page, 'validation')
 
     await page.evaluate(() => {
       ;(window as unknown as { __instance: CVEmbedInstance }).__instance.send('syncState', {})
     })
-    await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(before)
+    // A host that attached late needs both. ready restates the handshake and
+    // validationChange restates the issues, which carry the detail a host
+    // cannot reconstruct from the score in ready.
+    await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(beforeReady)
+    await expect.poll(() => countKind(page, 'validation')).toBeGreaterThan(beforeValidation)
   })
 
   test('answers requestExport with the route and the format that was asked for', async ({ page, isMobile }) => {
@@ -693,7 +736,7 @@ test.describe('SDK bridge security', () => {
     expect(await countKind(page, 'ready')).toBe(before)
   })
 
-  test('a duplicate ready is delivered, and reload resets the ready flag', async ({ page, isMobile }) => {
+  test('a duplicate ready is delivered, and a repeated update does not reload', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop-only flow')
     await mountHost(page)
     const frame = await embedFrame(page)
@@ -715,9 +758,39 @@ test.describe('SDK bridge security', () => {
     })
     await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(before)
 
-    await page.evaluate(() => {
-      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.update({ resumeData: { changed: true } })
-    })
-    await expect.poll(async () => page.evaluate(() => (window as unknown as { __instance: CVEmbedInstance }).__instance.isReady())).toBe(false)
+    // An update that resolves to the same URL must leave the live frame alone.
+    // Reloading it would drop a document a reader is looking at.
+    await page.evaluate((resume) => {
+      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.update({ resumeData: resume })
+    }, RESUME)
+    await settle(page)
+    expect(await page.evaluate(() => (window as unknown as { __instance: CVEmbedInstance }).__instance.isReady())).toBe(true)
+    expect(await countKind(page, 'ready')).toBe(before + 1)
+  })
+
+  test('update with a new document reloads the frame and handshakes again', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop-only flow')
+    await mountHost(page)
+    const frame = await embedFrame(page)
+    await expect(frame.locator('.resume-template').first()).toBeVisible()
+    await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(0)
+    const before = await countKind(page, 'ready')
+
+    const replacement = {
+      ...RESUME,
+      basics: { ...RESUME.basics, name: 'Reloaded Person' },
+    }
+
+    // Replacing the document changes only the URL fragment, which is a
+    // same-document navigation. If the frame is not forced to load a new
+    // document it keeps rendering the old CV, never handshakes again, and
+    // isReady() stays false for the life of the instance.
+    await page.evaluate((resume) => {
+      ;(window as unknown as { __instance: CVEmbedInstance }).__instance.update({ resumeData: resume })
+    }, replacement)
+
+    await expect(frame.locator('.resume-template').first()).toContainText('Reloaded Person', { timeout: 15_000 })
+    await expect.poll(() => countKind(page, 'ready')).toBeGreaterThan(before)
+    await expect.poll(async () => page.evaluate(() => (window as unknown as { __instance: CVEmbedInstance }).__instance.isReady())).toBe(true)
   })
 })

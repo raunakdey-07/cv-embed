@@ -200,7 +200,7 @@ export function EmbedPage() {
       issues: structuredIssues,
       primaryGuidance,
     })
-  }, [postBridgeEvent, primaryGuidance, structuredIssues, validation])
+  }, [postBridgeEvent, primaryGuidance, structuredIssues, syncNonce, validation])
 
   useEffect(() => {
     const root = rootRef.current
