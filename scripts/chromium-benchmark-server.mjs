@@ -160,8 +160,11 @@ const server = createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not found' }))
 })
 
-server.listen(PORT, () => {
-  console.log(`[pdf-bench] chromium benchmark server listening on :${PORT}`)
+// Loopback, not every interface. This server drives a headless Chromium and
+// accepts POSTed payloads; nothing off this machine needs to reach it, and the
+// default address should not be reachable from the network.
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`[pdf-bench] chromium benchmark server listening on 127.0.0.1:${PORT}`)
   console.log(`[pdf-bench] rendering from ${PUBLIC_BASE_URL}`)
 })
 
