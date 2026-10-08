@@ -10,12 +10,17 @@ export const hasText = (value: string): boolean => value.trim() !== ''
 const HEX_COLOR = /^#[0-9a-f]{6}$/i
 
 /**
- * A host-supplied accent colour, or null when it is not a plain hex colour.
+ * A host-supplied accent colour, or undefined when it is not a plain hex colour.
  *
- * The embed reads this straight from the query string, so a shared link could
- * otherwise set the heading and link colour to the same value as the white
- * paper and render the whole CV unreadable. Rejecting the value falls back to
- * the document's own accent, which is what an omitted parameter does.
+ * The embed reads this straight from its query string and a host can set it
+ * over the bridge, and the value ends up in a style declaration. Requiring the
+ * same shape the builder's own colour picker produces keeps anything else out,
+ * and a rejected value falls back to the document's accent rather than being
+ * applied.
+ *
+ * Contrast is deliberately not policed here. #ffffff is a valid colour and the
+ * builder lets a user pick it, so refusing it would make the embed stricter
+ * than the editor.
  */
 export function safePrimaryColor(value: string | null | undefined): string | undefined {
   if (!value) return undefined

@@ -1551,6 +1551,7 @@ h4.skill-cat-title { margin: 0 0 6px; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  position: relative;
   font-family: 'Azeret Mono', monospace;
   font-size: 10px;
   font-weight: 600;
