@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyResume } from '../types/resume'
-import { getOrderedSectionIds, getRenderableSectionIds, hasSkills, sectionHasContent } from './contentChecks'
+import { getOrderedSectionIds, getRenderableSectionIds, hasSkills, safePrimaryColor, sectionHasContent } from './contentChecks'
+
+describe('safePrimaryColor', () => {
+  it('accepts a plain hex colour', () => {
+    expect(safePrimaryColor('#3b5bdb')).toBe('#3b5bdb')
+    expect(safePrimaryColor('#FFFFFF')).toBe('#FFFFFF')
+    expect(safePrimaryColor('  #3b5bdb  ')).toBe('#3b5bdb')
+  })
+
+  it('rejects anything else, so the accent falls back to the document', () => {
+    // The embed reads this from its own query string, so a shared link must not
+    // be able to set the heading colour to the white paper it is drawn on.
+    for (const value of ['#fff', 'red', '#12345', '#1234567', 'rgb(1,2,3)', 'url(x)', '', '  ']) {
+      expect(safePrimaryColor(value), value).toBeUndefined()
+    }
+    expect(safePrimaryColor(null)).toBeUndefined()
+    expect(safePrimaryColor(undefined)).toBeUndefined()
+  })
+})
 
 describe('resume section view model', () => {
   it('preserves configured order and appends missing known sections', () => {

@@ -6,6 +6,23 @@ import { DEFAULT_SECTION_ORDER, type Resume, type ResumeSectionKey } from '../ty
 
 export const hasText = (value: string): boolean => value.trim() !== ''
 
+/** Six-digit hex, the same shape `normalizeDocumentOptions` accepts. */
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
+
+/**
+ * A host-supplied accent colour, or null when it is not a plain hex colour.
+ *
+ * The embed reads this straight from the query string, so a shared link could
+ * otherwise set the heading and link colour to the same value as the white
+ * paper and render the whole CV unreadable. Rejecting the value falls back to
+ * the document's own accent, which is what an omitted parameter does.
+ */
+export function safePrimaryColor(value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  const candidate = value.trim()
+  return HEX_COLOR.test(candidate) ? candidate : undefined
+}
+
 export function hasContent<T extends object>(items: T[]): boolean {
   return items.some((item) =>
     Object.values(item as Record<string, unknown>).some((value) =>

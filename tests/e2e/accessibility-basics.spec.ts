@@ -108,6 +108,61 @@ test('reduced motion uses non-animated section scrolling', async ({ page, isMobi
   await expect.poll(async () => page.evaluate(() => (window as unknown as { __cvScrollBehaviors?: string[] }).__cvScrollBehaviors ?? [])).toContain('auto')
 })
 
+test('the skip link resolves on both routes', async ({ page }) => {
+  await page.goto('/builder')
+  await expect(page.locator('.skip-link')).toHaveAttribute('href', '#main-content')
+  expect(await page.evaluate(() => !!document.querySelector('#main-content'))).toBe(true)
+
+  // The embed route renders its own <main>, and third parties embed that route
+  // on their own pages. A skip link pointing at nothing is the one bypass
+  // mechanism those visitors have.
+  await page.addInitScript((resume) => {
+    sessionStorage.setItem('cvembed:draft', JSON.stringify(resume))
+  }, { ...LONG_RESUME, basics: { ...LONG_RESUME.basics, name: 'Embedded Person' } })
+  await page.goto('/embed/portable#data=' + Buffer.from(JSON.stringify({
+    ...LONG_RESUME,
+    basics: { ...LONG_RESUME.basics, name: 'Embedded Person', summary: 'Short summary.' },
+  })).toString('base64url'))
+  await expect(page.locator('.embed-host')).toBeVisible()
+  expect(await page.evaluate(() => !!document.querySelector('#main-content'))).toBe(true)
+})
+
+test('a malformed accent colour is ignored rather than written into the page', async ({ page }) => {
+  const resume = {
+    ...LONG_RESUME,
+    basics: { ...LONG_RESUME.basics, name: 'Colour Person', summary: 'Short summary.' },
+  }
+  const data = Buffer.from(JSON.stringify(resume)).toString('base64url')
+  const heading = page.locator('.resume-template h1')
+
+  // The embed takes this from its own query string and writes it to the
+  // --primary custom property. Anything that is not a plain hex colour has no
+  // business there, so it falls back to the document's own accent.
+  await page.goto(`/embed/portable?primaryColor=red#data=${data}`)
+  await expect(page.locator('.embed-host')).toBeVisible()
+  await expect(heading).toHaveCSS('color', 'rgb(17, 17, 17)')
+
+  // A real hex colour is honoured, so the check above is the guard working
+  // rather than the parameter being ignored.
+  await page.goto(`/embed/portable?primaryColor=%233b5bdb#data=${data}`)
+  await expect(heading).toHaveCSS('color', 'rgb(59, 91, 219)')
+
+  // The same rule applies to the bridge, where a host is the untrusted party.
+  await page.goto('/builder')
+  await page.evaluate(() => { document.getElementById('root')!.innerHTML = '<div id="sdk-target"></div>' })
+  await page.addScriptTag({ url: new URL('/sdk.js', page.url()).toString() })
+  await page.evaluate((data) => {
+    const w = window as unknown as { CVEmbed: { render: (config: unknown) => { send: (c: string, p: unknown) => void } } }
+    w.CVEmbed.render({
+      target: '#sdk-target',
+      baseUrl: location.origin,
+      resumeData: JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(data), (c) => c.charCodeAt(0)))),
+      height: 800,
+    }).send('setOptions', { primaryColor: 'red' })
+  }, data)
+  await expect(page.frameLocator('#sdk-target iframe').locator('.resume-template h1').first()).toHaveCSS('color', 'rgb(17, 17, 17)')
+})
+
 test('unknown routes explain how to recover', async ({ page }) => {
   await page.goto('/not-a-real-route')
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()

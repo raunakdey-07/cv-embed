@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { TemplateRenderer } from '../../components/templates/TemplateRenderer'
+import { safePrimaryColor } from '../../lib/contentChecks'
 import { loadEmbedResume } from '../../lib/storage'
 import { decodeResumeFromUrl, getResumeDataFromUrl, normalizeResume } from '../../lib/utils'
 import { resolveBuilderHandoff } from '../../lib/handoff'
@@ -97,7 +98,7 @@ export function EmbedPage() {
 
   const showDownload = hostOptions.showDownload
     ?? (searchParams.get('showDownload') !== '0' && searchParams.get('disableDownload') !== '1')
-  const primaryColor = hostOptions.primaryColor ?? searchParams.get('primaryColor') ?? undefined
+  const primaryColor = safePrimaryColor(hostOptions.primaryColor ?? searchParams.get('primaryColor'))
   const density = hostOptions.density
     ?? (searchParams.has('density')
       ? searchParams.get('density') === 'compact' ? 'compact' : 'comfortable'
@@ -371,7 +372,10 @@ export function EmbedPage() {
           // A partial payload updates only the options it names. Replacing the
           // whole object would make an absent field indistinguishable from an
           // explicit null, so `{ showDownload: false }` would quietly undo a
-          // primaryColor set a moment earlier.
+          // primaryColor set a moment earlier. primaryColor is checked for a
+          // readable hex colour on the way in, so a bad value falls back to the
+          // document's own accent instead of blanking the text against the
+          // paper.
           setHostOptions((previous) => {
             const next = { ...previous }
             if (command.payload.primaryColor !== undefined) next.primaryColor = command.payload.primaryColor
@@ -389,7 +393,7 @@ export function EmbedPage() {
 
   if (!resume) {
     return (
-      <main className="app-main single-pane">
+      <main id="main-content" className="app-main single-pane">
         <section className="panel">
           <h2>Resume not found</h2>
           <p>This embed payload is missing or invalid.</p>
@@ -400,6 +404,7 @@ export function EmbedPage() {
 
   return (
     <main
+      id="main-content"
       ref={rootRef}
       className="app-main single-pane embed-host"
       style={{ '--embed-font-scale': String(fontScale), '--embed-radius': `${radius}px` } as CSSProperties}
