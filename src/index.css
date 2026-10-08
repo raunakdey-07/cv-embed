@@ -1488,6 +1488,12 @@ h4.skill-cat-title { margin: 0 0 6px; }
   line-height: 1;
   color: var(--text-3);
   padding: 0;
+  /* The hit area extends past the glyph so the × is not a 7px target. The
+     chip is 11px tall, so the padding cannot grow the chip itself without
+     changing the layout; it reaches into the chip's own padding instead. */
+  min-width: 24px;
+  min-height: 24px;
+  margin: -6px;
   transition: color 0.12s;
 }
 
@@ -2346,11 +2352,10 @@ h4.skill-cat-title { margin: 0 0 6px; }
     gap: 5px;
   }
 
-  .tool-btn,
-  .embed-icon-btn,
-  .ghost-add,
-  .order-btn,
-  .completion-info-btn {
+  /* Only the toolbar button shrinks here. The coarse-pointer block above
+     raises the rest to a 40px target, and this later rule was cancelling the
+     width it had just granted, leaving 16-22px wide buttons on every phone. */
+  .tool-btn {
     min-width: 0;
   }
 

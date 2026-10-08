@@ -75,6 +75,16 @@ test.describe('Builder QoL flows', () => {
   test('mobile: section nav organize sheet toggles visibility and order', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'mobile-only flow')
 
+    await page.addInitScript(() => {
+      sessionStorage.setItem('cvembed:draft', JSON.stringify({
+        meta: { version: '1.0', template: 'minimal', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', documentOptions: {} },
+        basics: { name: 'Touch User', headline: 'Engineer', email: 't@example.com', phone: '1', location: 'Remote', summary: 'Builds reliable tools.', links: [] },
+        education: [{ institution: 'U', degree: 'BS', field: 'CS', cgpa: '', startDate: '', endDate: '', location: '' }],
+        experience: [], projects: [],
+        skills: { languages: ['TypeScript', 'React'], frameworks: [], tools: [], other: [] },
+        certifications: [], accomplishments: [], activities: [], volunteering: [], publications: [],
+      }))
+    })
     await page.goto('/builder')
     await expect(page.getByText('Resume Readiness')).toBeVisible()
 
@@ -89,6 +99,25 @@ test.describe('Builder QoL flows', () => {
     await organizeBtn.click()
     const sheet = page.locator('.organize-sheet')
     await expect(sheet).toBeVisible()
+
+    // Width too. A later narrow-viewport rule was cancelling the width the
+    // coarse-pointer block granted, so the icon buttons measured 16-22px wide
+    // on a phone while the height-only check above still passed. Every control
+    // here sits 3-5px from its neighbour, so the spacing exception for small
+    // targets does not apply to any of them.
+    const widths = await page.evaluate(() => {
+      const measure = (selector: string) => {
+        const element = document.querySelector(selector)
+        if (!element) return { selector, missing: true }
+        const rect = element.getBoundingClientRect()
+        return { selector, width: Math.round(rect.width), height: Math.round(rect.height) }
+      }
+      return ['.completion-info-btn', '.order-btn', '.chip button'].map(measure)
+    })
+    for (const target of widths) {
+      expect(target.missing, `${target.selector} exists`).toBeFalsy()
+      expect(target.width ?? 0, `${target.selector} width`).toBeGreaterThanOrEqual(24)
+    }
 
     // Basic defaults: optional sections start disabled.
     await expect(page.locator('#section-certifications')).toHaveCount(0)
