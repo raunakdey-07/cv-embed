@@ -55,6 +55,8 @@ export function SectionNav({
   onFormatClose,
 }: SectionNavProps) {
   const rootRef = useRef<HTMLElement>(null)
+  const organizeBtnRef = useRef<HTMLButtonElement>(null)
+  const formatBtnRef = useRef<HTMLButtonElement>(null)
 
   // Close open sheets on outside click or Escape.
   useEffect(() => {
@@ -68,8 +70,17 @@ export function SectionNav({
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (organizeOpen) onOrganizeClose()
-        if (formatOpen) onFormatClose()
+        // A closing sheet unmounts whatever the user had focused inside it, so
+        // focus would fall to <body> and the next Tab would restart from the
+        // top of the document. Hand it back to the button that opened it.
+        if (organizeOpen) {
+          onOrganizeClose()
+          organizeBtnRef.current?.focus()
+        }
+        if (formatOpen) {
+          onFormatClose()
+          formatBtnRef.current?.focus()
+        }
       }
     }
 
@@ -102,6 +113,7 @@ export function SectionNav({
       <div className="organize-wrap">
         <button
           type="button"
+          ref={formatBtnRef}
           className={`organize-btn format-btn ${formatOpen ? 'active' : ''}`}
           title="Formatting"
           aria-label="Formatting"
@@ -121,6 +133,7 @@ export function SectionNav({
       <div className="organize-wrap">
         <button
           type="button"
+          ref={organizeBtnRef}
           className={`organize-btn organize-sections-btn ${organizeOpen ? 'active' : ''}`}
           title="Organize sections"
           aria-label="Organize sections"

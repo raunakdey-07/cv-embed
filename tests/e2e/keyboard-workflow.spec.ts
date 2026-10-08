@@ -131,6 +131,9 @@ test.describe('keyboard-only workflow', () => {
 
     await page.keyboard.press('Escape')
     await expect(sheet).toBeHidden()
+    // The sheet unmounts whatever was focused inside it, so without this focus
+    // falls to <body> and the next Tab restarts from the top of the document.
+    await expect(organize).toBeFocused()
   })
 
   test('preview and export are reachable with the keyboard', async ({ page, isMobile }) => {
@@ -155,6 +158,16 @@ test.describe('keyboard-only workflow', () => {
     const exportButton = page.locator('.tool-btn[title="Export resume"]')
     const reached = await tabTo(page, exportButton)
     expect(reached, `reached export button in ${reached} tabs`).toBeGreaterThanOrEqual(0)
+
+    await exportButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.export-dropdown')).toBeVisible()
+
+    // Escape has to dismiss it. Without it the menu stayed open over the rest of
+    // the toolbar with no keyboard way out.
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.export-dropdown')).toHaveCount(0)
+    await expect(exportButton).toBeFocused()
 
     await exportButton.focus()
     await page.keyboard.press('Enter')

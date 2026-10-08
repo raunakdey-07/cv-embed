@@ -353,13 +353,18 @@ export function BuilderPage() {
   }, [])
 
   useEffect(() => {
-    if (!openPopover) return
+    // Escape closes whatever disclosure is open. The export menu is not part of
+    // `openPopover`, and a keyboard user who opened it with Enter had no way to
+    // dismiss it with Escape.
+    if (!openPopover && !exportOpen) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenPopover(null)
+      if (e.key !== 'Escape') return
+      if (openPopover) setOpenPopover(null)
+      if (exportOpen) setExportOpen(false)
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [openPopover])
+  }, [exportOpen, openPopover])
 
   useEffect(() => {
     savePublicBaseUrl(normalizeBaseUrl(embedBaseUrl))
