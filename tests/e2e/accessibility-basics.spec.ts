@@ -34,15 +34,41 @@ test('keyboard focus has a visible indicator and the skip link works', async ({ 
   await page.keyboard.press('Tab')
   await expect(page.locator('.skip-link')).toBeFocused()
 
-  const focusStyles = await page.evaluate(() => {
-    const element = document.querySelector<HTMLElement>('.header-import-btn')
-    element?.focus()
+  // Read the indicator from a form field, which used to drop `outline` on
+  // focus. The earlier version of this check used optional chaining around a
+  // selector: a missing element produced undefined, every `not.toBe` assertion
+  // passed anyway, and renaming the button would have left the test green. The
+  // selector result is asserted before it is used.
+  const indicator = await page.evaluate(() => {
+    const element = document.querySelector<HTMLInputElement>('#section-basics input')
     if (!element) return null
+    element.focus()
     const style = getComputedStyle(element)
-    return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth }
+    const toRgb = (value: string) => value.match(/[\d.]+/g)!.slice(0, 3).map(Number) as [number, number, number]
+    const luminance = ([r, g, b]: [number, number, number]) => {
+      const channel = (value: number) => {
+        const s = value / 255
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+      }
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    }
+    const outline = luminance(toRgb(style.outlineColor))
+    const behind = luminance(toRgb(style.backgroundColor))
+    return {
+      focused: document.activeElement === element,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+      // Measured against what the outline actually sits on. An outline that
+      // matches its surroundings is not an indicator.
+      contrast: (Math.max(outline, behind) + 0.05) / (Math.min(outline, behind) + 0.05),
+    }
   })
-  expect(focusStyles?.outlineStyle).not.toBe('none')
-  expect(focusStyles?.outlineWidth).not.toBe('0px')
+
+  expect(indicator, 'the name field exists').not.toBeNull()
+  expect(indicator?.focused, 'the field took focus').toBe(true)
+  expect(indicator?.outlineStyle).toBe('solid')
+  expect(Number.parseFloat(indicator?.outlineWidth ?? '0')).toBeGreaterThanOrEqual(2)
+  expect(indicator?.contrast ?? 0).toBeGreaterThan(3)
 })
 
 test('mobile import control opens a file chooser from either view', async ({ page, isMobile }) => {

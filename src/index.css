@@ -562,8 +562,9 @@ button.score-pill {
 }
 
 .embed-base-input:focus {
-  outline: none;
   border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .embed-link-card {
@@ -1263,12 +1264,17 @@ select {
   transition: border-color 0.12s;
 }
 
+/* A real 2px outline rather than a border-colour change plus a translucent
+   ring. --accent-dim is 10% alpha, which composites to roughly 1.1:1 against
+   the field background, so on its own it is not a perceivable focus indicator.
+   The outline sits outside the border, so it stays visible on every field
+   regardless of the field's own background. */
 input:focus,
 textarea:focus,
 select:focus {
-  outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-dim);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 input::placeholder,
@@ -1800,8 +1806,9 @@ h4.skill-cat-title { margin: 0 0 6px; }
 }
 
 .inline-select:focus {
-  outline: none;
   border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* ═══════════════════════ Mobile View Toggle ═══════════════════════ */
